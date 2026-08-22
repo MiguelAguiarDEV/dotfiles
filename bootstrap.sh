@@ -104,7 +104,14 @@ else
   note "shell actual: $CURRENT_SHELL"
   # Se prueba zsh ANTES de cambiar: un rc roto con la shell ya cambiada deja
   # la cuenta sin poder entrar.
-  if zsh -i -c 'exit' </dev/null >/dev/null 2>&1; then
+  #
+  # `exit 0` explicito, no `exit` a secas: sin argumento devuelve el estado del
+  # ultimo comando, y sin TTY el rc deja un aviso benigno del zle que lo pondria
+  # a 1. Lo que se comprueba es que el rc no reviente, no ese aviso: por eso se
+  # filtran ademas los errores reales del stderr.
+  zsh_err="$(zsh -i -c 'exit 0' </dev/null 2>&1 >/dev/null || true)"
+  zsh_bad="$(printf '%s' "$zsh_err" | grep -viE "can't change option: zle|no such file or directory: /dev/tty" || true)"
+  if zsh -i -c 'exit 0' </dev/null >/dev/null 2>&1 && [[ -z "$zsh_bad" ]]; then
     ok "zsh arranca sin errores con esta config"
     if ask "¿Poner zsh como shell por defecto?"; then
       grep -qx "$ZSH_PATH" /etc/shells || echo "$ZSH_PATH" | sudo tee -a /etc/shells >/dev/null
@@ -114,6 +121,7 @@ else
     fi
   else
     warn "zsh no arranca limpio con esta config; NO se cambia la shell"
+    [[ -n "$zsh_bad" ]] && printf '%s\n' "$zsh_bad" | head -3 | sed 's/^/      /'
   fi
 fi
 
