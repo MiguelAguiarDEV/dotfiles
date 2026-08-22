@@ -105,9 +105,28 @@ if [[ -f "$CFG" ]]; then
   # Ya se respondio antes. `promptStringOnce` no volveria a preguntar y
   # `chezmoi update` ni siquiera regenera el config, asi que preguntar aqui
   # seria enganoso: se ofrece rehacerlo de forma explicita.
+  #
+  # Los `|| true` no son decorativos: con `set -euo pipefail` un grep sin
+  # coincidencias devuelve 1 y mataria el script sin imprimir nada.
   note "ya hay una configuracion en $CFG"
-  grep -E '^\s+(name|email|github_user|editor)' "$CFG" 2>/dev/null | sed 's/^/    /'
-  if ask "¿Volver a rellenar tus datos?"; then rm -f "$CFG"; else RECONFIG=0; fi
+  guardado="$(grep -E '^[[:space:]]*(name|email|github_user|editor)[[:space:]]*=' "$CFG" 2>/dev/null || true)"
+  [[ -n "$guardado" ]] && printf '%s\n' "$guardado" | sed 's/^[[:space:]]*/    /'
+
+  # Un config de una version anterior del repo puede no tener todas las claves
+  # que las plantillas necesitan; sin ellas `chezmoi apply` falla al renderizar.
+  faltan=()
+  for k in name email github_user editor git_branch git_rebase docker k8s ai; do
+    grep -qE "^[[:space:]]*${k}[[:space:]]*=" "$CFG" 2>/dev/null || faltan+=("$k")
+  done
+  if (( ${#faltan[@]} )); then
+    warn "al config le faltan ${#faltan[@]} valores: ${faltan[*]}"
+    note "es de una version anterior; hay que volver a rellenarlo"
+    rm -f "$CFG"
+  elif ask "¿Volver a rellenar tus datos?"; then
+    rm -f "$CFG"
+  else
+    RECONFIG=0
+  fi
 fi
 
 if (( RECONFIG )) && interactive; then
