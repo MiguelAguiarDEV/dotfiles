@@ -1,0 +1,35 @@
+[user]
+	name = {{ .name }}
+	email = {{ .email }}
+
+[credential "https://github.com"]
+	helper =
+	helper = !gh auth git-credential
+[credential "https://gist.github.com"]
+	helper =
+	helper = !gh auth git-credential
+
+[init]
+	defaultBranch = main
+[pull]
+	rebase = false
+[core]
+	editor = nvim
+{{- if lookPath "delta" }}
+	pager = delta
+{{- end }}
+[merge]
+	conflictstyle = zdiff3
+[diff]
+	colorMoved = default
+{{- if lookPath "delta" }}
+
+# delta — instalado en esta máquina. Donde no lo esté, chezmoi omite este bloque
+# y git usa el pager por defecto en lugar de fallar.
+[interactive]
+	diffFilter = delta --color-only
+[delta]
+	navigate = true
+	line-numbers = true
+	side-by-side = false
+{{- end }}

@@ -1,0 +1,106 @@
+# ~/.shell_common.sh — configuración compartida entre bash y zsh.
+# Lo cargan ~/.bashrc y ~/.zshrc, así que TODO lo de aquí debe ser POSIX:
+# nada de globs (N), arrays zsh ni bashisms. Lo específico de cada shell
+# (completions, hooks de prompt) vive en su rc correspondiente.
+
+# --- PATH ---------------------------------------------------------------------
+export PATH="$HOME/.local/bin:$PATH"
+
+# Go: toolchain del sistema + binarios instalados con `go install`
+[ -d /usr/local/go/bin ] && export PATH="$PATH:/usr/local/go/bin"
+[ -d "$HOME/go/bin" ] && export PATH="$PATH:$HOME/go/bin"
+
+# Turso CLI
+[ -d "$HOME/.turso" ] && export PATH="$PATH:$HOME/.turso"
+
+# uv / Rust instalados en ~/.local/bin exportan su propio env
+[ -f "$HOME/.local/bin/env" ] && . "$HOME/.local/bin/env"
+
+# rustup clásico deja su env en ~/.cargo/env. Antes lo cargaba ~/.profile, que
+# solo lee bash: aquí lo ven las dos shells.
+[ -f "$HOME/.cargo/env" ] && . "$HOME/.cargo/env"
+
+# --- Node (nvm) ---------------------------------------------------------------
+# Cargar nvm.sh en cada arranque costaba ~400 ms medidos, mas que todo lo demas
+# del rc junto. En su lugar se mete en el PATH la version por defecto (leer un
+# directorio, ~3 ms) y `nvm` pasa a ser una funcion que carga el script de
+# verdad solo la primera vez que se la invoca. Asi `node`, `npm`, `npx` y los
+# globales instalados bajo esa version (pnpm, yarn) siguen disponibles desde el
+# primer prompt, sin pagar el arranque.
+# bash_completion de nvm es solo-bash: se carga en .bashrc, no aqui.
+export NVM_DIR="$HOME/.nvm"
+if [ -s "$NVM_DIR/nvm.sh" ]; then
+  _nvm_ver=""
+  # `default` puede ser una version literal (vXX.Y.Z) o un alias sin resolver
+  # (lts/*, node...). Solo la primera forma se puede usar sin cargar nvm.
+  if [ -r "$NVM_DIR/alias/default" ]; then
+    read -r _nvm_alias < "$NVM_DIR/alias/default"
+    case "$_nvm_alias" in
+      v*) [ -d "$NVM_DIR/versions/node/$_nvm_alias/bin" ] && _nvm_ver="$_nvm_alias" ;;
+    esac
+  fi
+  # Alias no resoluble o sin default: la ultima version instalada.
+  if [ -z "$_nvm_ver" ] && [ -d "$NVM_DIR/versions/node" ]; then
+    _nvm_ver="$(ls -1 "$NVM_DIR/versions/node" 2>/dev/null | sort -V | tail -1)"
+  fi
+  [ -n "$_nvm_ver" ] && [ -d "$NVM_DIR/versions/node/$_nvm_ver/bin" ] &&
+    PATH="$NVM_DIR/versions/node/$_nvm_ver/bin:$PATH"
+  unset _nvm_ver _nvm_alias
+
+  # Carga diferida: la primera llamada se come la funcion y delega en el nvm real.
+  nvm() {
+    unset -f nvm
+    . "$NVM_DIR/nvm.sh"
+    nvm "$@"
+  }
+fi
+
+# --- WSL: poda del PATH de Windows --------------------------------------------
+# WSL inyecta ~29 rutas de /mnt/c en el PATH. Cada busqueda fallida las recorre
+# todas sobre DrvFs, que es lentisimo: medido en esta maquina, 10 `command -v`
+# de comandos inexistentes pasan de 5 ms a 761 ms. Como los ficheros de
+# ~/.aliases se guardan justo con `command -v`, eso era ~290 ms de cada arranque.
+#
+# /etc/wsl.conf pone appendWindowsPath=false para que ya no lleguen; esto poda
+# las que queden (sesiones abiertas antes del cambio, o una maquina sin ese
+# ajuste) y devuelve solo System32, donde viven powershell.exe, cmd.exe,
+# wsl.exe y wslpath. El guard es la existencia del directorio: en Linux nativo
+# no hay /mnt/c y el bloque entero no hace nada.
+if [ -d /mnt/c/Windows/System32 ]; then
+  PATH="$(printf '%s' "$PATH" | tr ':' '\n' | grep -v '^/mnt/' | paste -sd: -)"
+  PATH="$PATH:/mnt/c/Windows/System32"
+  # powershell.exe no esta en System32 sino en este subdirectorio. Claude Code
+  # lo busca con `command -v` para leer imagenes del portapapeles de Windows.
+  [ -d "/mnt/c/Windows/System32/WindowsPowerShell/v1.0" ] &&
+    PATH="$PATH:/mnt/c/Windows/System32/WindowsPowerShell/v1.0"
+fi
+
+# --- Editor y navegador -------------------------------------------------------
+export EDITOR=nvim
+# WSL: abrir URLs con el navegador de Windows, si hay wrapper instalado
+[ -x /usr/local/bin/browser ] && export BROWSER=/usr/local/bin/browser
+
+# --- Aliases ------------------------------------------------------------------
+if [ -d "$HOME/.aliases" ]; then
+  for _f in "$HOME/.aliases"/*.sh; do
+    [ -r "$_f" ] && . "$_f"
+  done
+  unset _f
+fi
+
+# --- Secrets -------------------------------------------------------------------
+# Gancho generico: si existe ~/.secrets, se cargan todos sus *.sh. El repo no
+# genera ese directorio ni integra ningun gestor de contrasenas; los ficheros se
+# escriben a mano (`export VAR=...`, POSIX) y nunca se versionan.
+if [ -d "$HOME/.secrets" ]; then
+  # *.zsh se acepta por compatibilidad con secrets antiguos ya desplegados
+  for _f in "$HOME/.secrets"/*.sh "$HOME/.secrets"/*.zsh; do
+    [ -r "$_f" ] && . "$_f"
+  done
+  unset _f
+fi
+
+# Si tienes el CLI de 1Password configurado a mano, su token vive aqui. chezmoi
+# ya no lo usa; esto solo hace que `op` funcione en la shell. Sin el fichero,
+# la linea no hace nada.
+[ -f "$HOME/.config/op/env" ] && . "$HOME/.config/op/env"

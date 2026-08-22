@@ -1,0 +1,65 @@
+# Paquetes de Debian/Ubuntu — SOLO terminal.
+# Equivalente de packages/repo.txt para maquinas con apt (WSL, VPS).
+# Los nombres NO coinciden con los de Arch: aqui van los de Debian.
+#
+# Lo que NO esta en apt (o esta demasiado viejo) lo instala el propio script
+# run_onchange_before_install-packages.sh: neovim, eza, starship, lazygit y
+# lazydocker. Ver los comentarios de ese fichero.
+
+# --- Shell ---
+zsh
+zsh-autosuggestions
+zsh-syntax-highlighting
+bash-completion
+
+# --- Base del sistema ---
+build-essential
+ca-certificates
+gnupg
+apt-transport-https
+locales
+git
+gh
+openssh-client
+rsync
+less
+man-db
+unzip
+wget
+curl
+
+# --- Editores ---
+vim
+micro
+nano
+
+# --- Multiplexor ---
+tmux
+
+# --- CLI moderna ---
+bat
+ripgrep
+fd-find
+fzf
+zoxide
+direnv
+git-delta
+jq
+duf
+btop
+glances
+plocate
+speedtest-cli
+tealdeer
+httpie
+
+# --- Desarrollo ---
+golang-go
+python3
+python3-pip
+python3-venv
+docker.io
+docker-compose-v2
+
+# --- Red y seguridad ---
+ufw

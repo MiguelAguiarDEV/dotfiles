@@ -1,0 +1,8 @@
+# Paquetes AUR — SOLO terminal.
+# Se instalan con paru/yay durante `chezmoi apply`.
+# Fuera: google-chrome, visual-studio-code-bin, ttf-geist y la app de escritorio
+# de 1Password (era GUI). Queda solo el CLI, que en escritorio pierde la
+# integración con la app: autentica con OP_SERVICE_ACCOUNT_TOKEN en todas las
+# máquinas (ver README → Secrets).
+1password-cli
+lazydocker

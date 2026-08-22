@@ -1,0 +1,87 @@
+# ~/.config/starship.toml — prompt cross-shell (bash y zsh, misma config).
+# Dos líneas: el comando siempre empieza en la misma columna aunque el path
+# sea largo. Los módulos de lenguaje solo aparecen dentro de un proyecto que
+# los use, así que en un VPS el prompt queda corto por sí solo.
+
+add_newline = true
+command_timeout = 1000
+
+format = """
+$username$hostname$directory$git_branch$git_status$kubernetes$docker_context$golang$nodejs$python$aws
+$cmd_duration$character"""
+
+# --- Identidad de host --------------------------------------------------------
+# Solo por SSH: en local sobra, en el VPS avisa de dónde estás escribiendo.
+[username]
+show_always = false
+format = "[$user]($style)@"
+style_user = "bold yellow"
+style_root = "bold red"
+
+[hostname]
+ssh_only = true
+format = "[$hostname]($style) "
+style = "bold red"   # rojo = máquina remota, no ejecutes aquí por error
+
+# --- Directorio ---------------------------------------------------------------
+[directory]
+# Ruta completa, siempre. Por defecto starship recortaba a 3 componentes y,
+# dentro de un repo, mostraba solo lo relativo a su raiz.
+truncation_length = 0      # 0 = no truncar
+truncate_to_repo = false   # dentro de un repo, la ruta entera igual
+truncation_symbol = ""
+home_symbol = "~"          # el home sigue como ~, no /home/mx
+style = "bold cyan"
+
+# --- Git ----------------------------------------------------------------------
+[git_branch]
+symbol = " "
+format = "[$symbol$branch]($style) "
+style = "bold purple"
+
+[git_status]
+format = "[$all_status$ahead_behind]($style) "
+style = "bold red"
+
+# --- Contexto de infraestructura ----------------------------------------------
+[kubernetes]
+disabled = false
+symbol = "󱃾 "
+format = "[$symbol$context( \\($namespace\\))]($style) "
+style = "bold blue"
+
+[docker_context]
+symbol = " "
+format = "[$symbol$context]($style) "
+style = "bold blue"
+
+[aws]
+symbol = " "
+format = "[$symbol$profile]($style) "
+style = "bold yellow"
+
+# --- Lenguajes: solo dentro de un proyecto que los use ------------------------
+[golang]
+symbol = " "
+format = "[$symbol$version]($style) "
+style = "bold cyan"
+
+[nodejs]
+symbol = " "
+format = "[$symbol$version]($style) "
+style = "bold green"
+
+[python]
+symbol = " "
+format = "[$symbol$version]($style) "
+style = "bold yellow"
+
+# --- Segunda línea ------------------------------------------------------------
+[cmd_duration]
+min_time = 2000
+format = "[$duration]($style) "
+style = "bold yellow"
+
+[character]
+success_symbol = "[❯](bold green)"
+error_symbol = "[❯](bold red)"

@@ -1,0 +1,27 @@
+return {
+  "rmagatti/goto-preview",
+  event = "LspAttach",
+  opts = {
+    width = 100,
+    height = 20,
+    border = { "╭", "─", "╮", "│", "╯", "─", "╰", "│" },
+    default_mappings = false,
+    debug = false,
+    opacity = nil,
+    resizing_mappings = false,
+    post_open_hook = nil,
+    references = { telescope = nil },
+    focus_on_open = true,
+    dismiss_on_move = false,
+    force_close = true,
+    bufhidden = "wipe",
+  },
+  keys = {
+    { "gpd", function() require("goto-preview").goto_preview_definition() end,      desc = "Preview definition" },
+    { "gpD", function() require("goto-preview").goto_preview_declaration() end,     desc = "Preview declaration" },
+    { "gpi", function() require("goto-preview").goto_preview_implementation() end,  desc = "Preview implementation" },
+    { "gpt", function() require("goto-preview").goto_preview_type_definition() end, desc = "Preview type definition" },
+    { "gpr", function() require("goto-preview").goto_preview_references() end,      desc = "Preview references" },
+    { "gP",  function() require("goto-preview").close_all_win() end,                desc = "Close all preview windows" },
+  },
+}

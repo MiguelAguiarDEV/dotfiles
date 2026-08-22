@@ -1,0 +1,76 @@
+# Paquetes del repo oficial (Arch/CachyOS) — SOLO terminal.
+# Lista de INTENCIÓN, no un volcado de `pacman -Qen`: aquí va lo que quieres
+# reproducir en cualquier máquina, no lo que instaló el instalador de la distro.
+# Kernel, drivers, filesystems, audio, boot y escritorio quedan fuera a propósito.
+
+# --- Shell ---
+zsh
+zsh-autosuggestions
+zsh-syntax-highlighting
+bash-completion
+starship
+
+# --- Base del sistema ---
+base-devel
+sudo
+git
+openssh
+rsync
+less
+which
+diffutils
+man-db
+man-pages
+unzip
+unrar
+wget
+pv
+
+# --- Editores ---
+neovim
+vim
+micro
+nano
+
+# --- Multiplexor ---
+tmux
+
+# --- CLI moderna ---
+bat
+eza
+ripgrep
+fd
+fzf
+zoxide
+direnv
+git-delta
+lazygit
+jq
+yq
+duf
+btop
+glances
+plocate
+fastfetch
+speedtest-cli
+tealdeer
+httpie
+
+# --- Desarrollo ---
+github-cli
+go
+python
+python-pip
+nvm
+docker
+docker-buildx
+docker-compose
+
+# --- Gestión del sistema ---
+chezmoi
+paru
+pacman-contrib
+
+# --- Red y seguridad ---
+ufw
+tailscale

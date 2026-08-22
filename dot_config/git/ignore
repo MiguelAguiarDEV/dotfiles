@@ -1,0 +1,14 @@
+# gitignore global (core.excludesFile por defecto en XDG).
+# Patrones que nunca deben entrar en NINGÚN repo, sea de quien sea.
+
+# Claude Code: permisos y estado por máquina, no compartibles
+**/.claude/settings.local.json
+
+# Ruido del sistema operativo
+.DS_Store
+Thumbs.db
+
+# Ruido de editores
+*.swp
+*~
+.idea/

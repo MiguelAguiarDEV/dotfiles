@@ -1,0 +1,17 @@
+{{/* Configuración de la máquina — se resuelve UNA vez en `chezmoi init` y queda
+     guardada en ~/.config/chezmoi/chezmoi.toml.
+
+     Sin condicionales por hostname: solo importa la CLASE de máquina. `wsl` se
+     autodetecta; la identidad de git se pregunta, con el valor de tu
+     configuración global de git como propuesta por defecto. */}}
+{{- $name  := promptStringOnce . "name"  "Tu nombre para git" (output "git" "config" "--global" "--get" "user.name"  | trim) -}}
+{{- $email := promptStringOnce . "email" "Tu email para git"  (output "git" "config" "--global" "--get" "user.email" | trim) -}}
+{{- $wsl := false -}}
+{{- if hasKey .chezmoi "kernel" -}}
+{{-   $wsl = contains "microsoft" (.chezmoi.kernel.osrelease | lower) -}}
+{{- end -}}
+
+[data]
+    name  = {{ $name  | quote }}
+    email = {{ $email | quote }}
+    wsl   = {{ $wsl }}

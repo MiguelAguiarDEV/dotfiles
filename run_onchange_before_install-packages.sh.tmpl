@@ -1,0 +1,143 @@
+#!/usr/bin/env bash
+# Instala los paquetes listados en packages/ y las herramientas que no estan
+# empaquetadas. Se ejecuta antes del resto de `chezmoi apply`.
+# Los hashes de abajo hacen que chezmoi lo re-ejecute cuando cambian las listas.
+#
+# repo.txt  hash: {{ include "packages/repo.txt" | sha256sum }}
+# apt.txt   hash: {{ include "packages/apt.txt"  | sha256sum }}
+# aur.txt   hash: {{ include "packages/aur.txt"  | sha256sum }}
+
+set -eu
+
+SOURCE_DIR="{{ .chezmoi.sourceDir }}"
+BIN="$HOME/.local/bin"
+SHARE="$HOME/.local/share"
+# En una maquina limpia ~/.local ni existe.
+mkdir -p "$BIN" "$SHARE"
+
+# Nombres de paquete, sin comentarios ni lineas vacias.
+extract() { grep -Ev '^[[:space:]]*(#|$)' "$1" 2>/dev/null || true; }
+have()    { command -v "$1" >/dev/null 2>&1; }
+
+# ==========================================================================
+# 1. Paquetes de la distribucion
+# ==========================================================================
+if have pacman; then
+    echo "==> Arch: paquetes del repo oficial"
+    mapfile -t PKGS < <(extract "$SOURCE_DIR/packages/repo.txt")
+    [ "${#PKGS[@]}" -gt 0 ] && sudo pacman -S --needed --noconfirm "${PKGS[@]}"
+
+    echo "==> Arch: paquetes AUR"
+    mapfile -t AUR < <(extract "$SOURCE_DIR/packages/aur.txt")
+    if [ "${#AUR[@]}" -gt 0 ]; then
+        if   have paru; then paru -S --needed --noconfirm "${AUR[@]}"
+        elif have yay;  then yay  -S --needed --noconfirm "${AUR[@]}"
+        else echo "WARN: ni paru ni yay instalados; los paquetes AUR quedan pendientes"; fi
+    fi
+
+elif have apt-get; then
+    echo "==> Debian/Ubuntu: paquetes de apt"
+    export DEBIAN_FRONTEND=noninteractive
+    # Esperar al lock de dpkg en vez de morir: en una maquina recien arrancada
+    # suele haber un unattended-upgrade o un postinst largo (plocate indexa
+    # varios minutos) ocupandolo.
+    APT="sudo apt-get -o DPkg::Lock::Timeout=600"
+
+    # Dependencias del propio script, antes de usarlas. En una imagen base
+    # limpia no hay ni gpg ni wget, y anadir el repo de eza los necesita.
+    $APT update -qq
+    $APT install -y -q ca-certificates gnupg curl wget
+
+    # eza no esta en los repos de Debian ni de Ubuntu: repo propio del proyecto.
+    if ! have eza && [ ! -f /etc/apt/sources.list.d/gierens.list ]; then
+        echo "    anadiendo el repo de eza"
+        sudo mkdir -p /etc/apt/keyrings
+        curl -fsSL https://raw.githubusercontent.com/eza-community/eza/main/deb.asc \
+            | sudo gpg --dearmor -o /etc/apt/keyrings/gierens.gpg --yes
+        echo "deb [signed-by=/etc/apt/keyrings/gierens.gpg] http://deb.gierens.de stable main" \
+            | sudo tee /etc/apt/sources.list.d/gierens.list >/dev/null
+        $APT update -qq
+    fi
+    mapfile -t PKGS < <(extract "$SOURCE_DIR/packages/apt.txt")
+    [ "${#PKGS[@]}" -gt 0 ] && $APT install -y -q "${PKGS[@]}"
+    have eza || $APT install -y -q eza || echo "WARN: eza no se pudo instalar"
+
+    # Debian renombra estos dos binarios para no colisionar con otros paquetes.
+    [ -x /usr/bin/batcat ] && ln -sf /usr/bin/batcat "$BIN/bat"
+    [ -x /usr/bin/fdfind ] && ln -sf /usr/bin/fdfind "$BIN/fd"
+
+    # Locale UTF-8: sin el, los iconos de eza y starship salen como '?'.
+    if have locale-gen && ! locale -a 2>/dev/null | grep -qi '^C\.utf8\|en_US\.utf8'; then
+        sudo locale-gen en_US.UTF-8 >/dev/null 2>&1 || true
+        sudo update-locale LANG=en_US.UTF-8 >/dev/null 2>&1 || true
+    fi
+else
+    echo "Sin pacman ni apt-get: instala los paquetes a mano (ver packages/)"
+fi
+
+# ==========================================================================
+# 2. Herramientas sin empaquetar (o con version demasiado vieja)
+#    Todas se instalan en ~/.local/bin, sin sudo.
+# ==========================================================================
+ARCH="$(uname -m)"
+
+# --- starship: no esta en apt; en Arch viene de repo.txt -------------------
+if ! have starship; then
+    echo "==> starship"
+    curl -sS https://starship.rs/install.sh | sh -s -- -y -b "$BIN" >/dev/null 2>&1 \
+        || echo "WARN: no se pudo instalar starship"
+fi
+
+# --- neovim: Ubuntu 24.04 trae 0.9.5 y la config usa opciones de 0.11+ -----
+nvim_ok() {
+    have nvim || return 1
+    nvim --version | head -1 | grep -qE 'v(0\.(1[1-9]|[2-9][0-9])|[1-9])' 
+}
+if ! nvim_ok; then
+    case "$ARCH" in
+        x86_64)  NVIM_ASSET=nvim-linux-x86_64 ;;
+        aarch64) NVIM_ASSET=nvim-linux-arm64  ;;
+        *)       NVIM_ASSET="" ;;
+    esac
+    if [ -n "$NVIM_ASSET" ]; then
+        echo "==> neovim (la version de la distro es anterior a 0.11)"
+        tmp="$(mktemp -d)"
+        if curl -fsSL -o "$tmp/nvim.tar.gz" \
+             "https://github.com/neovim/neovim/releases/latest/download/${NVIM_ASSET}.tar.gz" \
+           && tar -xzf "$tmp/nvim.tar.gz" -C "$tmp"; then
+            rm -rf "$SHARE/nvim-dist"
+            mv "$tmp/$NVIM_ASSET" "$SHARE/nvim-dist"
+            ln -sf "$SHARE/nvim-dist/bin/nvim" "$BIN/nvim"
+        else
+            echo "WARN: no se pudo instalar neovim"
+        fi
+        rm -rf "$tmp"
+    fi
+fi
+
+# --- lazygit y lazydocker: binarios de GitHub, no estan en apt -------------
+gh_binary() {   # gh_binary <repo> <nombre> <patron-del-asset>
+    local repo="$1" name="$2" pattern="$3" url tmp
+    have "$name" && return 0
+    echo "==> $name"
+    # -i: lazygit publica "linux_x86_64" en minuscula y lazydocker
+    # "Linux_x86_64"; el mismo patron vale para los dos.
+    url="$(curl -fsSL "https://api.github.com/repos/$repo/releases/latest" 2>/dev/null \
+          | grep -oi "https://[^\"]*${pattern}[^\"]*\.tar\.gz" | head -1)" || true
+    [ -n "$url" ] || { echo "WARN: no se encontro release de $name"; return 0; }
+    tmp="$(mktemp -d)"
+    if curl -fsSL -o "$tmp/a.tar.gz" "$url" && tar -xzf "$tmp/a.tar.gz" -C "$tmp" "$name" 2>/dev/null; then
+        install -m 755 "$tmp/$name" "$BIN/$name"
+    else
+        echo "WARN: no se pudo instalar $name"
+    fi
+    rm -rf "$tmp"
+}
+case "$ARCH" in
+    x86_64)  gh_binary jesseduffield/lazygit    lazygit    "Linux_x86_64"
+             gh_binary jesseduffield/lazydocker lazydocker "Linux_x86_64" ;;
+    aarch64) gh_binary jesseduffield/lazygit    lazygit    "Linux_arm64"
+             gh_binary jesseduffield/lazydocker lazydocker "Linux_arm64" ;;
+esac
+
+echo "==> Paquetes sincronizados."

@@ -1,0 +1,26 @@
+#!/bin/sh
+# Resuelve la ruta WSL del %TEMP% de Windows sin hardcodear el usuario,
+# y la cachea (PowerShell tarda ~1s en arrancar). Si cambias de usuario de
+# Windows, borra la cache: rm ~/.cache/win-temp-path
+CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/win-temp-path"
+
+if [ -r "$CACHE" ]; then
+  cat "$CACHE"
+  exit 0
+fi
+
+WINTMP="$(powershell.exe -NoProfile -Command 'Write-Output $env:TEMP' 2>/dev/null | tr -d '\r')"
+if [ -z "$WINTMP" ]; then
+  echo "win-temp-path: no se pudo obtener %TEMP% de Windows (¿estamos en WSL?)" >&2
+  exit 1
+fi
+
+WSLTMP="$(wslpath -u "$WINTMP" 2>/dev/null)"
+if [ -z "$WSLTMP" ] || [ ! -d "$WSLTMP" ]; then
+  echo "win-temp-path: wslpath no pudo traducir '$WINTMP'" >&2
+  exit 1
+fi
+
+mkdir -p "$(dirname "$CACHE")"
+printf '%s\n' "$WSLTMP" > "$CACHE"
+printf '%s\n' "$WSLTMP"

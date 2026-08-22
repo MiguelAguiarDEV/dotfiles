@@ -1,0 +1,13 @@
+# Local secrets — never commit
+.secrets
+.secrets/**
+
+# OS noise
+.DS_Store
+Thumbs.db
+
+# Editor noise
+*.swp
+*~
+.idea/
+.vscode/

@@ -1,0 +1,18 @@
+# Rutas del source que `chezmoi apply` NO debe aplicar en $HOME.
+# OJO: este fichero ES una plantilla — usa .wsl/.op del config.
+# En máquinas que aún no han corrido `chezmoi init` todos evalúan a false.
+#
+# Solo se listan rutas que EXISTEN en el source: chezmoi jamás toca ficheros
+# que no gestiona, así que listar caches/historiales/navegadores aquí no
+# protege nada.
+
+# ===== Solo viven en el repo (no son config de $HOME) =====
+README.md
+LICENSE
+packages
+bootstrap.sh
+
+{{ if not .wsl -}}
+# ===== Solo WSL: puentes con Windows =====
+.local/bin/win-temp-path
+{{- end }}

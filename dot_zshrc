@@ -1,0 +1,121 @@
+# ~/.zshrc — sin gestor de plugins: dos `source` directos hacen lo mismo que
+# oh-my-zsh sin su coste de arranque. Prompt: starship (cross-shell, igual en
+# bash). Lo compartido con bash (PATH, nvm, editor, aliases, secrets) vive en
+# ~/.shell_common.sh. Ajustes de un solo host: ~/.zshrc.local (no versionado).
+
+# --- Historial ---------------------------------------------------------------
+HISTFILE=~/.zsh_history
+HISTSIZE=50000
+SAVEHIST=50000
+setopt SHARE_HISTORY HIST_IGNORE_ALL_DUPS HIST_REDUCE_BLANKS INC_APPEND_HISTORY
+
+# --- Comportamiento ----------------------------------------------------------
+setopt AUTO_CD INTERACTIVE_COMMENTS NO_BEEP
+
+# --- Config compartida bash/zsh: PATH, nvm, editor, aliases, secrets ---------
+# Va PRIMERO a proposito: poda el PATH de Windows en WSL. Cualquier `command -v`
+# ejecutado antes recorreria las ~29 rutas de /mnt/c sobre DrvFs (medido: 245 ms
+# solo en el bucle de completions de aqui abajo).
+[ -r "$HOME/.shell_common.sh" ] && source "$HOME/.shell_common.sh"
+
+# --- Completions -------------------------------------------------------------
+# Las de CLIs de terceros se generan UNA vez en ~/.zsh/completions; regenerar
+# es borrar el fichero. Asi se evita el `eval "$(x completion zsh)"` en cada
+# arranque, que era el grueso del coste de los plugins de oh-my-zsh.
+_zcomp="$HOME/.zsh/completions"
+[ -d "$_zcomp" ] || mkdir -p "$_zcomp"
+for _cli in kubectl helm docker; do
+  if command -v "$_cli" >/dev/null 2>&1 && [ ! -s "$_zcomp/_$_cli" ]; then
+    "$_cli" completion zsh > "$_zcomp/_$_cli" 2>/dev/null || rm -f "$_zcomp/_$_cli"
+  fi
+done
+if command -v gh >/dev/null 2>&1 && [ ! -s "$_zcomp/_gh" ]; then
+  gh completion -s zsh > "$_zcomp/_gh" 2>/dev/null || rm -f "$_zcomp/_gh"
+fi
+fpath=("$_zcomp" $fpath)
+unset _zcomp _cli
+
+zstyle ':completion:*' matcher-list 'm:{a-z}={A-Za-z}'
+zstyle ':completion:*' menu select
+autoload -Uz compinit && compinit -C   # -C: no revalida la cache en cada arranque
+
+# --- Prompt y herramientas ---------------------------------------------------
+command -v starship >/dev/null 2>&1 && eval "$(starship init zsh)"
+command -v zoxide   >/dev/null 2>&1 && eval "$(zoxide init zsh)"
+command -v direnv   >/dev/null 2>&1 && eval "$(direnv hook zsh)"
+
+# fzf keybindings (Ctrl+R historial, Ctrl+T fichero, Alt+C directorio).
+# La ruta cambia según distro; `fzf --zsh` es lo moderno y va primero.
+if command -v fzf >/dev/null 2>&1; then
+  if fzf --zsh >/dev/null 2>&1; then
+    source <(fzf --zsh)
+  else
+    for _f in /usr/share/fzf/key-bindings.zsh \
+              /usr/share/doc/fzf/examples/key-bindings.zsh; do
+      [ -r "$_f" ] && source "$_f" && break
+    done
+    unset _f
+  fi
+fi
+
+# --- Plugins: dos `source`, sin gestor ---------------------------------------
+# Rutas por orden: paquete de Arch, paquete de Debian/Ubuntu, git clone manual.
+_zplug() {
+  local name="$1" file="$2" p
+  for p in "/usr/share/zsh/plugins/$name/$file" \
+           "/usr/share/$name/$file" \
+           "$HOME/.zsh/$name/$file"; do
+    [ -r "$p" ] && source "$p" && return 0
+  done
+  return 1
+}
+# Solo `history`: la estrategia `completion` lanza el sistema de completado en
+# CADA pulsacion y se nota como lag al escribir. `history` es una busqueda en el
+# fichero de historial, practicamente gratis.
+ZSH_AUTOSUGGEST_STRATEGY=(history)
+# Sin sugerencias en lineas muy largas (pegar un comando enorme no debe pensar).
+ZSH_AUTOSUGGEST_BUFFER_MAX_SIZE=20
+_zplug zsh-autosuggestions zsh-autosuggestions.zsh
+
+# syntax-highlighting va SIEMPRE al final: envuelve los widgets ya definidos.
+_zplug zsh-syntax-highlighting zsh-syntax-highlighting.zsh
+unset -f _zplug
+
+# --- Teclas de edicion --------------------------------------------------------
+# zsh pelado no enlaza Ctrl+flechas, Inicio/Fin ni Supr: lo hacia oh-my-zsh.
+# Las secuencias son las que envian Windows Terminal, xterm y la mayoria de
+# emuladores modernos; se enlazan las dos variantes (\e[ y \eO) porque cambian
+# segun el modo de teclado de la aplicacion.
+bindkey -e                                   # keymap emacs, explicito
+
+# / . - _ dejan de contar como parte de la palabra: Ctrl+flecha para en cada
+# tramo de una ruta en vez de saltarsela entera.
+WORDCHARS='*?[]~&;!#$%^(){}<>'
+
+bindkey '^[[1;5C' forward-word                # Ctrl + Derecha
+bindkey '^[[1;5D' backward-word               # Ctrl + Izquierda
+bindkey '^[[1;3C' forward-word                # Alt  + Derecha
+bindkey '^[[1;3D' backward-word               # Alt  + Izquierda
+bindkey '^[^[[C'  forward-word                # Alt  + Derecha (variante)
+bindkey '^[^[[D'  backward-word               # Alt  + Izquierda (variante)
+
+bindkey '^[[H' beginning-of-line              # Inicio
+bindkey '^[[F' end-of-line                    # Fin
+bindkey '^[OH' beginning-of-line              # Inicio (modo aplicacion)
+bindkey '^[OF' end-of-line                    # Fin    (modo aplicacion)
+bindkey '^[[3~' delete-char                   # Supr
+bindkey '^[[3;5~' kill-word                   # Ctrl + Supr: borra palabra derecha
+bindkey '^H' backward-kill-word               # Ctrl + Retroceso: palabra izquierda
+bindkey '^[[Z' reverse-menu-complete          # Mayus + Tab: completar hacia atras
+
+# Flechas arriba/abajo: buscan en el historial solo lo que ya has escrito.
+autoload -Uz up-line-or-beginning-search down-line-or-beginning-search
+zle -N up-line-or-beginning-search
+zle -N down-line-or-beginning-search
+bindkey '^[[A' up-line-or-beginning-search
+bindkey '^[[B' down-line-or-beginning-search
+bindkey '^[OA' up-line-or-beginning-search
+bindkey '^[OB' down-line-or-beginning-search
+
+# --- Overrides por máquina (no versionado, ver .chezmoiignore) ---------------
+[ -f "$HOME/.zshrc.local" ] && source "$HOME/.zshrc.local"
