@@ -58,10 +58,8 @@ httpie
 
 # --- Desarrollo ---
 github-cli
-go
 python
 python-pip
-nvm
 docker
 docker-buildx
 docker-compose

@@ -64,7 +64,8 @@ Enter lo acepta.
 | **Preferencias** | Editor | el primero de nvim/vim/micro/nano que tengas | `$EDITOR`, `$VISUAL`, `git core.editor` |
 | | Rama por defecto | `main` | `git init.defaultBranch` |
 | | `git pull --rebase` | no | `git pull.rebase` |
-| **Qué instalar** | Docker | sí | filtra los paquetes de docker de las listas |
+| **Lenguajes** | Go · Rust · Node · Python | sí los cuatro | instalados bajo `$HOME`, sin `sudo` |
+| **Qué más** | Docker | sí | filtra los paquetes de docker de las listas |
 | | Aliases de Kubernetes | no | despliega o no `~/.aliases/30-kubectl.sh` |
 | | Aliases de agentes IA | no | despliega o no `~/.aliases/60-ai.sh` |
 
@@ -115,6 +116,18 @@ toque. Además instala lo que no está empaquetado, en `~/.local/bin` y sin
 | **eza** | No está en Debian ni Ubuntu; se añade el repo del proyecto |
 | **lazygit**, **lazydocker** | Solo publican binarios en GitHub |
 
+### Lenguajes
+
+Los cuatro se instalan bajo `$HOME`, sin `sudo`, y cada uno se puede desmarcar
+en el asistente:
+
+| | Cómo | Por qué así |
+|---|---|---|
+| **Go** | tarball oficial → `~/.local/share/go-dist` | Ubuntu 24.04 trae 1.22; la oficial va por 1.27. Solo se instala si el sistema no tiene ya 1.25 o superior |
+| **Rust** | `rustup` → `~/.cargo` | Con `--no-modify-path`: del `PATH` se encarga `~/.shell_common.sh`, así rustup no toca tus rc |
+| **Node** | `nvm` + LTS → `~/.nvm` | Para cambiar de versión por proyecto. `nvm` se carga de forma diferida, así que no cuesta nada al arrancar |
+| **Python** | el de la distro + **`uv`** | `python3` ya viene en todas; lo que falta es un gestor moderno |
+
 Y resuelve dos cosas más de Debian: los enlaces `bat`→`batcat` y `fd`→`fdfind`
 (Debian los renombra), y el locale UTF-8 sin el cual los iconos de eza y
 starship salen como `?`.
@@ -146,7 +159,8 @@ DOTFILES_NAME="Tu Nombre" DOTFILES_EMAIL=tu@correo.com DOTFILES_K8S=true \
 ```
 
 Las variables son `DOTFILES_` + `NAME`, `EMAIL`, `GH`, `EDITOR`, `BRANCH`,
-`REBASE`, `DOCKER`, `K8S`, `AI`. Los booleanos aceptan `true` o `false`.
+`REBASE`, `GO`, `RUST`, `NODE`, `PYTHON`, `DOCKER`, `K8S`, `AI`. Los booleanos
+aceptan `true` o `false`.
 
 ## Secrets
 

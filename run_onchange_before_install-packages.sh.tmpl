@@ -118,6 +118,83 @@ if ! nvim_ok; then
     fi
 fi
 
+# --- Lenguajes ------------------------------------------------------------
+# Todos se instalan bajo $HOME, sin sudo, y solo si se pidieron en el wizard.
+{{ if .lang_go }}
+# Go: el paquete de Ubuntu 24.04 es 1.22 y el de Debian suele ir aun mas atras.
+# Se instala el tarball oficial salvo que el sistema ya traiga algo reciente.
+go_recent() {
+    have go || return 1
+    local v; v="$(go version 2>/dev/null | grep -oE 'go[0-9]+\.[0-9]+' | head -1 | tr -d 'go')"
+    [ -n "$v" ] || return 1
+    # 1.25 como suelo: por debajo de eso no hay generics-era completa ni las
+    # mejoras de rendimiento del runtime que asume el resto del stack.
+    [ "$(printf '%s\n1.25\n' "$v" | sort -V | head -1)" = "1.25" ]
+}
+if ! go_recent; then
+    echo "==> go"
+    GO_VER="$(curl -fsSL 'https://go.dev/VERSION?m=text' 2>/dev/null | head -1)"
+    case "$ARCH" in x86_64) GO_ARCH=amd64 ;; aarch64) GO_ARCH=arm64 ;; *) GO_ARCH="" ;; esac
+    if [ -n "$GO_VER" ] && [ -n "$GO_ARCH" ]; then
+        tmp="$(mktemp -d)"
+        if curl -fsSL -o "$tmp/go.tar.gz" "https://go.dev/dl/${GO_VER}.linux-${GO_ARCH}.tar.gz" \
+           && tar -xzf "$tmp/go.tar.gz" -C "$tmp"; then
+            rm -rf "$SHARE/go-dist"
+            mv "$tmp/go" "$SHARE/go-dist"
+            # GOROOT se deduce de la ruta real del binario, asi que el symlink basta.
+            ln -sf "$SHARE/go-dist/bin/go"    "$BIN/go"
+            ln -sf "$SHARE/go-dist/bin/gofmt" "$BIN/gofmt"
+            echo "    $GO_VER instalado en $SHARE/go-dist"
+        else
+            echo "WARN: no se pudo instalar go"
+        fi
+        rm -rf "$tmp"
+    else
+        echo "WARN: no se pudo determinar la version de go"
+    fi
+fi
+{{ end }}
+{{ if .lang_rust }}
+# Rust: rustup gestiona toolchains y se actualiza solo con `rustup update`.
+if ! have rustup; then
+    echo "==> rust (rustup)"
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+        | sh -s -- -y --no-modify-path --profile default >/dev/null 2>&1 \
+        || echo "WARN: no se pudo instalar rustup"
+    # --no-modify-path: del PATH ya se encarga ~/.shell_common.sh cargando
+    # ~/.cargo/env, y asi rustup no toca .bashrc ni .profile por su cuenta.
+fi
+{{ end }}
+{{ if .lang_node }}
+# Node: nvm en vez del paquete de la distro, para poder cambiar de version por
+# proyecto. ~/.shell_common.sh lo carga de forma diferida.
+if [ ! -s "$HOME/.nvm/nvm.sh" ]; then
+    echo "==> node (nvm)"
+    NVM_VER="$(curl -fsSL https://api.github.com/repos/nvm-sh/nvm/releases/latest 2>/dev/null \
+               | grep -o '"tag_name": *"[^"]*"' | head -1 | cut -d'"' -f4)"
+    NVM_VER="${NVM_VER:-v0.40.7}"
+    # PROFILE=/dev/null: el instalador de nvm anadiria su bloque a .bashrc y
+    # .zshrc, que ya lo cargan desde ~/.shell_common.sh.
+    PROFILE=/dev/null curl -fsSL \
+        "https://raw.githubusercontent.com/nvm-sh/nvm/${NVM_VER}/install.sh" \
+        | PROFILE=/dev/null bash >/dev/null 2>&1 || echo "WARN: no se pudo instalar nvm"
+fi
+if [ -s "$HOME/.nvm/nvm.sh" ] && [ ! -d "$HOME/.nvm/versions/node" ]; then
+    echo "    instalando Node LTS…"
+    # shellcheck source=/dev/null
+    . "$HOME/.nvm/nvm.sh" && nvm install --lts >/dev/null 2>&1 && nvm alias default 'lts/*' >/dev/null 2>&1 \
+        || echo "WARN: no se pudo instalar Node LTS"
+fi
+{{ end }}
+{{ if .lang_python }}
+# Python ya viene de las listas de paquetes; lo que falta es un gestor moderno.
+if ! have uv; then
+    echo "==> uv (gestor de paquetes y versiones de Python)"
+    curl -LsSf https://astral.sh/uv/install.sh | sh >/dev/null 2>&1 \
+        || echo "WARN: no se pudo instalar uv"
+fi
+{{ end }}
+
 # --- lazygit y lazydocker: binarios de GitHub, no estan en apt -------------
 gh_binary() {   # gh_binary <repo> <nombre> <patron-del-asset>
     local repo="$1" name="$2" pattern="$3" url tmp

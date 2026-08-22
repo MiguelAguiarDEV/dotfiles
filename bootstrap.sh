@@ -115,7 +115,8 @@ if [[ -f "$CFG" ]]; then
   # Un config de una version anterior del repo puede no tener todas las claves
   # que las plantillas necesitan; sin ellas `chezmoi apply` falla al renderizar.
   faltan=()
-  for k in name email github_user editor git_branch git_rebase docker k8s ai; do
+  for k in name email github_user editor git_branch git_rebase docker k8s ai \
+           lang_go lang_rust lang_node lang_python; do
     grep -qE "^[[:space:]]*${k}[[:space:]]*=" "$CFG" 2>/dev/null || faltan+=("$k")
   done
   if (( ${#faltan[@]} )); then
@@ -142,7 +143,13 @@ if (( RECONFIG )) && interactive; then
   field W_BRANCH "Rama por defecto"  "main"
   yesno W_REBASE "git pull --rebase" false
 
-  printf '\n  %s%sQue instalar%s\n' "$B" "$C" "$R"
+  printf '\n  %s%sLenguajes%s %s(bajo tu \$HOME, sin sudo)%s\n' "$B" "$C" "$R" "$D" "$R"
+  yesno W_GO     "Go"                      true
+  yesno W_RUST   "Rust (rustup)"           true
+  yesno W_NODE   "Node (nvm + LTS)"        true
+  yesno W_PYTHON "Python (+ uv)"           true
+
+  printf '\n  %s%sQue mas instalar%s\n' "$B" "$C" "$R"
   yesno W_DOCKER "Docker"                  true
   yesno W_K8S    "Aliases de Kubernetes"   false
   yesno W_AI     "Aliases de agentes IA"   false
@@ -151,6 +158,7 @@ elif (( RECONFIG )); then
   note "sin terminal interactiva: se usan los valores por defecto"
   W_NAME="$DEF_NAME"; W_EMAIL="$DEF_EMAIL"; W_GH="$DEF_GH"
   W_EDITOR="$DEF_EDITOR"; W_BRANCH="main"; W_REBASE=false
+  W_GO=true; W_RUST=true; W_NODE=true; W_PYTHON=true
   W_DOCKER=true; W_K8S=false; W_AI=false
 else
   note "se conservan los datos ya guardados"
@@ -166,7 +174,9 @@ if (( RECONFIG )); then
   export DOTFILES_GH="$W_GH"         DOTFILES_EDITOR="$W_EDITOR"
   export DOTFILES_BRANCH="$W_BRANCH" DOTFILES_REBASE="$W_REBASE"
   export DOTFILES_DOCKER="$W_DOCKER" DOTFILES_K8S="$W_K8S"
-  export DOTFILES_AI="$W_AI"
+  export DOTFILES_AI="$W_AI"           DOTFILES_GO="$W_GO"
+  export DOTFILES_RUST="$W_RUST"       DOTFILES_NODE="$W_NODE"
+  export DOTFILES_PYTHON="$W_PYTHON"
   PROMPTS=(--promptDefaults)
 fi
 
@@ -251,7 +261,8 @@ fi
 # ==========================================================================
 printf '\n%s%s  ✓ Listo%s\n\n' "$B" "$G" "$R"
 note "Comprobacion rapida:"
-for c in starship zsh eza bat fd rg fzf zoxide direnv delta nvim lazygit; do
+for c in starship zsh eza bat fd rg fzf zoxide direnv delta nvim lazygit \
+         go rustc node python3 uv; do
   if have "$c"; then printf '    %s✓%s %s\n' "$G" "$R" "$c"
   else               printf '    %s·%s %s (no instalado)\n' "$D" "$R" "$c"; fi
 done
