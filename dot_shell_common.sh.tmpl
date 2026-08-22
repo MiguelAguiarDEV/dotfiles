@@ -81,25 +81,32 @@ export VISUAL="$EDITOR"
 # WSL: abrir URLs con el navegador de Windows, si hay wrapper instalado
 [ -x /usr/local/bin/browser ] && export BROWSER=/usr/local/bin/browser
 
-# --- Aliases ------------------------------------------------------------------
-if [ -d "$HOME/.aliases" ]; then
-  for _f in "$HOME/.aliases"/*.sh; do
+# --- Cargador de directorios ---------------------------------------------------
+# Hace source de los ficheros de un directorio, en orden alfabetico.
+#
+# El `setopt` no es opcional: ante un glob sin coincidencias, bash deja el
+# patron literal (y el `[ -r ]` lo descarta) pero zsh ABORTA el fichero entero
+# con "no matches found". null_glob iguala los dos comportamientos, y
+# local_options lo revierte al salir de la funcion.
+_load_dir() {
+  [ -d "$1" ] || return 0
+  [ -n "${ZSH_VERSION:-}" ] && setopt local_options null_glob
+  for _f in "$1"/*.sh "$1"/*.zsh; do
     [ -r "$_f" ] && . "$_f"
   done
   unset _f
-fi
+  return 0
+}
+
+# --- Aliases ------------------------------------------------------------------
+_load_dir "$HOME/.aliases"
 
 # --- Secrets -------------------------------------------------------------------
-# Gancho generico: si existe ~/.secrets, se cargan todos sus *.sh. El repo no
-# genera ese directorio ni integra ningun gestor de contrasenas; los ficheros se
-# escriben a mano (`export VAR=...`, POSIX) y nunca se versionan.
-if [ -d "$HOME/.secrets" ]; then
-  # *.zsh se acepta por compatibilidad con secrets antiguos ya desplegados
-  for _f in "$HOME/.secrets"/*.sh "$HOME/.secrets"/*.zsh; do
-    [ -r "$_f" ] && . "$_f"
-  done
-  unset _f
-fi
+# Gancho generico: si existe ~/.secrets, se cargan sus *.sh (y *.zsh, por
+# compatibilidad con secrets antiguos ya desplegados). El repo no genera ese
+# directorio ni integra ningun gestor de contrasenas: los ficheros se escriben a
+# mano o los deja `secrets-setup`, y nunca se versionan.
+_load_dir "$HOME/.secrets"
 
 # Si tienes el CLI de 1Password configurado a mano, su token vive aqui. chezmoi
 # ya no lo usa; esto solo hace que `op` funcione en la shell. Sin el fichero,
