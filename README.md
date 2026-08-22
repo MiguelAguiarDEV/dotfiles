@@ -159,18 +159,24 @@ POSIX puro) y nunca se versionan — `.gitignore` los excluye.
 
 Para instalar y autenticar un gestor hay un asistente aparte: **`secrets-setup`**,
 que se despliega en `~/.local/bin/`. Es un script independiente — no lo llama
-`chezmoi apply` ni condiciona el resto del repo. Cubre cuatro opciones:
+`chezmoi apply` ni condiciona el resto del repo.
 
-| Gestor | Cómo autentica | Sirve en un VPS sin nadie delante |
-|---|---|---|
-| `1password` | Service account (token `ops_…` de solo lectura) | **Sí** |
-| `bitwarden` | `bw login` + `bw unlock`; la sesión caduca al bloquear | No |
-| `rbw` | Cliente Rust con agente; no hay que pasar `BW_SESSION` | No |
-| `pass` | Ficheros GPG en un repo git, sin nube | Sí, con la clave GPG presente |
+Su objetivo es **autenticarse una vez y no volver a hacerlo**:
 
-Detecta el gestor de paquetes (`pacman` / `apt`), instala el CLI, guía el login
-y verifica que la sesión lee de verdad. Cuando hace falta una credencial de
-entorno la escribe en `~/.secrets/` con permisos `600` — nunca en el repo.
+| Gestor | Cómo evita re-autenticar |
+|---|---|
+| `1password` | Service account: un token de solo lectura que **no caduca**. Es el único pensado para máquinas sin nadie delante. |
+| `bitwarden` | API key (evita el login) + contraseña maestra guardada, y un wrapper de `bw` que desbloquea **la primera vez que lo usas en cada shell**, no al arrancar. |
+| `pass` | GPG: no hay sesión que expire. El asistente sube además la caché del agente a 8 h. |
+
+El desbloqueo automático de Bitwarden guarda la contraseña maestra en
+`~/.secrets/10-bitwarden.sh` (permisos `600`, fuera del repo). El asistente lo
+avisa y deja declinar: entonces guarda solo la API key y el desbloqueo sigue
+siendo manual.
+
+Detecta el gestor de paquetes (`pacman` / `apt`), instala el CLI, guía el alta
+de credenciales y verifica que lee **sin pedir nada**. Todo lo que escribe va a
+`~/.secrets/` — nunca al repo.
 
 ```bash
 secrets-setup
