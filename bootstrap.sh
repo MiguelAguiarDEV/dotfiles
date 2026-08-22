@@ -65,7 +65,7 @@ mkdir -p "$BIN"
 export PATH="$BIN:$PATH"
 
 # ==========================================================================
-say "1/5 · Prerrequisitos"
+say "1/6 · Prerrequisitos"
 # ==========================================================================
 MISSING=()
 for c in curl git; do have "$c" || MISSING+=("$c"); done
@@ -79,7 +79,7 @@ fi
 ok "curl y git disponibles"
 
 # ==========================================================================
-say "2/5 · chezmoi"
+say "2/6 · chezmoi"
 # ==========================================================================
 if have chezmoi; then
   ok "ya instalado: $(chezmoi --version | head -1)"
