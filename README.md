@@ -16,6 +16,34 @@ chezmoi                 plantillas por máquina, sin condicionales por hostname
 
 Arranque medido: **295 ms** en zsh, **133 ms** en bash.
 
+## Windows: de cero a todo listo
+
+Un solo script deja un Windows recién instalado con WSL2, Ubuntu y estos
+dotfiles. **En PowerShell como administrador:**
+
+```powershell
+irm https://raw.githubusercontent.com/MiguelAguiarDEV/dotfiles/main/install-windows.ps1 | iex
+```
+
+| Paso | Qué hace |
+|---|---|
+| 1 · WSL2 | Habilita las features de Windows y actualiza el kernel |
+| 2 · `.wslconfig` | Memoria (la mitad de la RAM), CPUs, swap, `autoMemoryReclaim`, red en modo espejo |
+| 3 · Ubuntu | La instala y crea tu usuario con contraseña y `sudo`, sin el asistente interactivo |
+| 4 · Fuente | JetBrainsMono Nerd Font en tu perfil (sin permisos de máquina) |
+| 5 · Terminal | Fuente, tema oscuro, y el perfil de WSL por defecto arrancando en `~` |
+| 6 · Dotfiles | Lanza `bootstrap.sh` dentro de WSL, con su asistente |
+
+Es idempotente y detecta lo que ya está hecho. Si Windows aún no tenía WSL hará
+falta **un reinicio**: el script lo dice y, al volver a ejecutarlo, continúa por
+donde iba. Si ya tienes una Ubuntu registrada, la reutiliza en vez de instalar
+otra en paralelo.
+
+```powershell
+# opciones
+.\install-windows.ps1 -User miguel -Distro Ubuntu-24.04 -SkipTerminal
+```
+
 ## Probar sin instalar nada
 
 ```bash

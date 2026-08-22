@@ -1,0 +1,6 @@
+# El .ps1 lleva BOM UTF-8 (PowerShell 5.1 lee los .ps1 sin BOM como ANSI y
+# corrompe los caracteres no ASCII). Se marca como binario para que ninguna
+# conversion de finales de linea ni de codificacion lo toque.
+install-windows.ps1 -text
+
+* text=auto eol=lf
