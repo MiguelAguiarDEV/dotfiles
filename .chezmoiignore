@@ -15,4 +15,5 @@ bootstrap.sh
 {{ if not .wsl -}}
 # ===== Solo WSL: puentes con Windows =====
 .local/bin/win-temp-path
+.aliases/70-wsl.sh
 {{- end }}
