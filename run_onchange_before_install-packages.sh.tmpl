@@ -16,7 +16,10 @@ SHARE="$HOME/.local/share"
 mkdir -p "$BIN" "$SHARE"
 
 # Nombres de paquete, sin comentarios ni lineas vacias.
-extract() { grep -Ev '^[[:space:]]*(#|$)' "$1" 2>/dev/null || true; }
+# El filtro final quita Docker cuando no se ha pedido en `chezmoi init`.
+extract() {
+    grep -Ev '^[[:space:]]*(#|$)' "$1" 2>/dev/null {{ if not .docker }}| grep -v '^docker'{{ end }} || true
+}
 have()    { command -v "$1" >/dev/null 2>&1; }
 
 # ==========================================================================

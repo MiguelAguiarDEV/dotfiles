@@ -38,18 +38,39 @@ Sobre tu propio fork, sin editar nada:
 DOTFILES_REPO=tu-usuario/dotfiles bash bootstrap.sh
 ```
 
-`bootstrap.sh` hace cinco cosas, y es idempotente:
+`bootstrap.sh` hace seis cosas, y es idempotente:
 
 | Paso | Qué hace |
 |---|---|
 | 1 · Prerrequisitos | Instala `curl` y `git` si faltan (pacman o apt) |
 | 2 · chezmoi | Lo descarga a `~/.local/bin` si no está |
-| 3 · Repo | Prueba SSH primero, cae a HTTPS. `chezmoi init --apply`, que dispara la instalación de paquetes |
-| 4 · Shell | **Comprueba que zsh arranca limpio antes** de ofrecer `chsh`. Con un rc roto y la shell ya cambiada te quedas fuera de la cuenta |
-| 5 · Secretos | Ofrece lanzar `secrets-setup` (opcional) |
+| 3 · **Tus datos** | Un asistente pregunta lo que hay que personalizar (abajo) |
+| 4 · Repo | Prueba SSH primero, cae a HTTPS. `chezmoi init --apply`, que dispara la instalación de paquetes |
+| 5 · Shell | **Comprueba que zsh arranca limpio antes** de ofrecer `chsh`. Con un rc roto y la shell ya cambiada te quedas fuera de la cuenta |
+| 6 · Secretos | Ofrece lanzar `secrets-setup` (opcional) |
 
-Solo pregunta dos cosas: **tu nombre y tu email para git**, y propone los que ya
-tengas en tu configuración global. Todo lo demás se autodetecta.
+### El asistente
+
+Se responde **una sola vez**: queda guardado en
+`~/.config/chezmoi/chezmoi.toml` y los siguientes `chezmoi apply` no vuelven a
+preguntar. Cada campo propone un valor por defecto sacado de tu máquina, y
+Enter lo acepta.
+
+| | Campo | Por defecto | Dónde acaba |
+|---|---|---|---|
+| **Identidad** | Nombre | tu `git config user.name` | `~/.gitconfig` |
+| | Email | tu `git config user.email` | `~/.gitconfig` |
+| | Usuario de GitHub | `gh api user` si estás autenticado | disponible en las plantillas |
+| **Preferencias** | Editor | el primero de nvim/vim/micro/nano que tengas | `$EDITOR`, `$VISUAL`, `git core.editor` |
+| | Rama por defecto | `main` | `git init.defaultBranch` |
+| | `git pull --rebase` | no | `git pull.rebase` |
+| **Qué instalar** | Docker | sí | filtra los paquetes de docker de las listas |
+| | Aliases de Kubernetes | no | despliega o no `~/.aliases/30-kubectl.sh` |
+| | Aliases de agentes IA | no | despliega o no `~/.aliases/60-ai.sh` |
+
+Al re-ejecutar el bootstrap detecta que ya respondiste, te enseña lo guardado y
+ofrece rehacerlo. Sin terminal interactiva (CI, provisioning desatendido) toma
+todos los valores por defecto sin preguntar.
 
 A mano, si prefieres:
 
@@ -100,23 +121,28 @@ starship salen como `?`.
 
 ## Clasificación de máquina
 
-`.chezmoi.toml.tmpl` fija tres variables en `chezmoi init`:
-
-| Variable | Cómo se fija | Para qué |
-|---|---|---|
-| `name` | pregunta (propone tu `git config user.name`) | `~/.gitconfig` |
-| `email` | pregunta (propone tu `git config user.email`) | `~/.gitconfig` |
-| `wsl` | autodetectada (kernel `microsoft`) | fuera de WSL excluye `win-temp-path`, el único helper que depende de Windows |
+`.chezmoi.toml.tmpl` guarda diez variables, todas resueltas en `chezmoi init`:
+las nueve del asistente más `wsl`, que se autodetecta (kernel `microsoft`) y
+excluye los puentes con Windows en el resto de máquinas.
 
 No hay condicionales por hostname: solo importa la **clase** de máquina. Lo que
 depende de una herramienta va con guarda de existencia (`[ -d … ]` en shell,
 `lookPath` en plantillas Go), y lo que aplica a un solo host va en
 `~/.bashrc.local` / `~/.zshrc.local`, que no se versionan.
 
-Para responder sin interacción (CI, provisioning desatendido):
+Sin `bootstrap.sh`, `chezmoi init` hace las mismas preguntas en texto plano.
+Para responder sin interacción:
 
 ```bash
 chezmoi init --apply --promptDefaults https://github.com/MiguelAguiarDEV/dotfiles.git
+```
+
+O fijando valores concretos:
+
+```bash
+chezmoi init --apply \
+  --promptString name="Tu Nombre" --promptString email=tu@correo.com \
+  --promptBool k8s=true https://github.com/MiguelAguiarDEV/dotfiles.git
 ```
 
 ## Secrets

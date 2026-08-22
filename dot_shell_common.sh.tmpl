@@ -76,7 +76,8 @@ if [ -d /mnt/c/Windows/System32 ]; then
 fi
 
 # --- Editor y navegador -------------------------------------------------------
-export EDITOR=nvim
+export EDITOR={{ .editor }}
+export VISUAL="$EDITOR"
 # WSL: abrir URLs con el navegador de Windows, si hay wrapper instalado
 [ -x /usr/local/bin/browser ] && export BROWSER=/usr/local/bin/browser
 

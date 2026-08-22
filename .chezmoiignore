@@ -17,3 +17,13 @@ bootstrap.sh
 .local/bin/win-temp-path
 .aliases/70-wsl.sh
 {{- end }}
+
+{{ if not .k8s -}}
+# ===== Sin Kubernetes =====
+.aliases/30-kubectl.sh
+{{- end }}
+
+{{ if not .ai -}}
+# ===== Sin agentes de IA =====
+.aliases/60-ai.sh
+{{- end }}

@@ -35,6 +35,32 @@ warn() { printf '  %s⚠ %s%s\n' "$Y" "$1" "$R"; }
 have() { command -v "$1" >/dev/null 2>&1; }
 ask()  { local r; printf '  %s? %s [y/N]%s ' "$Y" "$1" "$R"; read -r r </dev/tty || true; [[ "$r" =~ ^[Yy] ]]; }
 
+# ¿Hay alguien delante? Sin terminal no se puede preguntar nada, y el wizard se
+# salta entero en favor de los valores por defecto.
+interactive() { [[ -r /dev/tty && -t 0 ]] || [[ -r /dev/tty && -t 1 ]]; }
+
+# field VAR "Etiqueta" "valor por defecto" — texto libre; Enter acepta el default.
+field() {
+  local var="$1" label="$2" def="${3:-}" in=""
+  if [[ -n "$def" ]]; then printf '  %s%-22s%s %s[%s]%s ' "$B" "$label" "$R" "$D" "$def" "$R"
+  else                     printf '  %s%-22s%s ' "$B" "$label" "$R"; fi
+  read -r in </dev/tty || true
+  printf -v "$var" '%s' "${in:-$def}"
+}
+
+# yesno VAR "Etiqueta" default(true|false) — Enter acepta el default.
+yesno() {
+  local var="$1" label="$2" def="$3" in="" hint
+  [[ "$def" == true ]] && hint="S/n" || hint="s/N"
+  printf '  %s%-22s%s %s[%s]%s ' "$B" "$label" "$R" "$D" "$hint" "$R"
+  read -r in </dev/tty || true
+  case "$in" in
+    [SsYy]*) printf -v "$var" 'true'  ;;
+    [Nn]*)   printf -v "$var" 'false' ;;
+    *)       printf -v "$var" '%s' "$def" ;;
+  esac
+}
+
 mkdir -p "$BIN"
 export PATH="$BIN:$PATH"
 
@@ -64,7 +90,70 @@ fi
 CHEZMOI="$(command -v chezmoi || echo "$BIN/chezmoi")"
 
 # ==========================================================================
-say "3/5 · Repo de dotfiles"
+say "3/6 · Tus datos"
+# ==========================================================================
+# Defaults: lo que ya tengas configurado en la maquina.
+DEF_NAME="$(git config --global --get user.name  2>/dev/null || true)"
+DEF_EMAIL="$(git config --global --get user.email 2>/dev/null || true)"
+DEF_GH="$(gh api user --jq .login 2>/dev/null || true)"
+DEF_EDITOR="vim"
+for e in nvim vim micro nano; do have "$e" && { DEF_EDITOR="$e"; break; }; done
+
+CFG="${XDG_CONFIG_HOME:-$HOME/.config}/chezmoi/chezmoi.toml"
+RECONFIG=1
+if [[ -f "$CFG" ]]; then
+  # Ya se respondio antes. `promptStringOnce` no volveria a preguntar y
+  # `chezmoi update` ni siquiera regenera el config, asi que preguntar aqui
+  # seria enganoso: se ofrece rehacerlo de forma explicita.
+  note "ya hay una configuracion en $CFG"
+  grep -E '^\s+(name|email|github_user|editor)' "$CFG" 2>/dev/null | sed 's/^/    /'
+  if ask "¿Volver a rellenar tus datos?"; then rm -f "$CFG"; else RECONFIG=0; fi
+fi
+
+if (( RECONFIG )) && interactive; then
+  note "Enter acepta el valor entre corchetes. Se pregunta una sola vez:"
+  note "queda guardado en ~/.config/chezmoi/chezmoi.toml."
+  printf '\n  %s%sIdentidad%s %s(va a tu ~/.gitconfig)%s\n' "$B" "$C" "$R" "$D" "$R"
+  field W_NAME  "Nombre"             "$DEF_NAME"
+  field W_EMAIL "Email"              "$DEF_EMAIL"
+  field W_GH    "Usuario de GitHub"  "$DEF_GH"
+
+  printf '\n  %s%sPreferencias%s\n' "$B" "$C" "$R"
+  field W_EDITOR "Editor"            "$DEF_EDITOR"
+  field W_BRANCH "Rama por defecto"  "main"
+  yesno W_REBASE "git pull --rebase" false
+
+  printf '\n  %s%sQue instalar%s\n' "$B" "$C" "$R"
+  yesno W_DOCKER "Docker"                  true
+  yesno W_K8S    "Aliases de Kubernetes"   false
+  yesno W_AI     "Aliases de agentes IA"   false
+  printf '\n'
+elif (( RECONFIG )); then
+  note "sin terminal interactiva: se usan los valores por defecto"
+  W_NAME="$DEF_NAME"; W_EMAIL="$DEF_EMAIL"; W_GH="$DEF_GH"
+  W_EDITOR="$DEF_EDITOR"; W_BRANCH="main"; W_REBASE=false
+  W_DOCKER=true; W_K8S=false; W_AI=false
+else
+  note "se conservan los datos ya guardados"
+fi
+
+# Estos valores alimentan las plantillas del repo; chezmoi los guarda y no
+# vuelve a preguntar en los siguientes `apply`.
+PROMPTS=()
+(( RECONFIG )) && PROMPTS=(
+  --promptString "name=$W_NAME"
+  --promptString "email=$W_EMAIL"
+  --promptString "github_user=$W_GH"
+  --promptString "editor=$W_EDITOR"
+  --promptString "git_branch=$W_BRANCH"
+  --promptBool   "git_rebase=$W_REBASE"
+  --promptBool   "docker=$W_DOCKER"
+  --promptBool   "k8s=$W_K8S"
+  --promptBool   "ai=$W_AI"
+)
+
+# ==========================================================================
+say "4/6 · Repo de dotfiles"
 # ==========================================================================
 # Se elige el transporte que realmente funcione, en vez de asumir uno.
 REPO=""
@@ -83,16 +172,19 @@ fi
 
 if [[ -d "$($CHEZMOI source-path 2>/dev/null || echo /nonexistent)/.git" ]]; then
   ok "el repo ya esta clonado en $($CHEZMOI source-path)"
+  # `chezmoi update` no regenera el config: si se han vuelto a pedir los datos,
+  # hay que pasar por `init` antes.
+  (( ${#PROMPTS[@]} )) && "$CHEZMOI" init "${PROMPTS[@]}"
   note "actualizando y aplicando…"
   "$CHEZMOI" update --force
 else
   note "clonando y aplicando (esto instala tambien los paquetes)…"
-  "$CHEZMOI" init --apply --promptDefaults "$REPO"
+  "$CHEZMOI" init --apply ${PROMPTS[@]+"${PROMPTS[@]}"} "$REPO"
 fi
 ok "dotfiles aplicados"
 
 # ==========================================================================
-say "4/5 · Shell por defecto"
+say "5/6 · Shell por defecto"
 # ==========================================================================
 CURRENT_SHELL="$(getent passwd "$USER" | cut -d: -f7)"
 ZSH_PATH="$(command -v zsh || true)"
@@ -126,7 +218,7 @@ else
 fi
 
 # ==========================================================================
-say "5/5 · Gestor de contrasenas (opcional)"
+say "6/6 · Gestor de contrasenas (opcional)"
 # ==========================================================================
 if [[ -x "$BIN/secrets-setup" ]]; then
   if ask "¿Lanzar secrets-setup ahora?"; then

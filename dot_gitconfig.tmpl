@@ -10,11 +10,11 @@
 	helper = !gh auth git-credential
 
 [init]
-	defaultBranch = main
+	defaultBranch = {{ .git_branch }}
 [pull]
-	rebase = false
+	rebase = {{ .git_rebase }}
 [core]
-	editor = nvim
+	editor = {{ .editor }}
 {{- if lookPath "delta" }}
 	pager = delta
 {{- end }}

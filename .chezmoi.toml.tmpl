@@ -1,17 +1,52 @@
 {{/* Configuración de la máquina — se resuelve UNA vez en `chezmoi init` y queda
      guardada en ~/.config/chezmoi/chezmoi.toml.
 
-     Sin condicionales por hostname: solo importa la CLASE de máquina. `wsl` se
-     autodetecta; la identidad de git se pregunta, con el valor de tu
-     configuración global de git como propuesta por defecto. */}}
-{{- $name  := promptStringOnce . "name"  "Tu nombre para git" (output "git" "config" "--global" "--get" "user.name"  | trim) -}}
-{{- $email := promptStringOnce . "email" "Tu email para git"  (output "git" "config" "--global" "--get" "user.email" | trim) -}}
+     `bootstrap.sh` hace estas mismas preguntas con una interfaz más cómoda y
+     las pasa con `--promptString` / `--promptBool`, así que en el flujo normal
+     nada de esto llega a preguntarse aquí. Estos prompts son el camino de
+     respaldo para quien use `chezmoi init` a pelo.
+
+     Los defaults salen de `sh -c "... || true"` y no de `output "git" ...` a
+     secas: `git config --get` devuelve 1 cuando la clave no existe, y eso
+     abortaría la plantilla en una máquina sin git configurado. */}}
+{{- $gitName  := output "sh" "-c" "git config --global --get user.name  2>/dev/null || true" | trim -}}
+{{- $gitEmail := output "sh" "-c" "git config --global --get user.email 2>/dev/null || true" | trim -}}
+{{- $ghUser   := output "sh" "-c" "gh api user --jq .login 2>/dev/null || true" | trim -}}
+{{- $anEditor := "" -}}
+{{- range list "nvim" "vim" "micro" "nano" -}}
+{{-   if and (eq $anEditor "") (lookPath .) }}{{ $anEditor = . }}{{ end -}}
+{{- end -}}
+{{- if eq $anEditor "" }}{{ $anEditor = "vim" }}{{ end -}}
+
+{{- /* --- Identidad --- */ -}}
+{{- $name  := promptStringOnce . "name"        "Tu nombre para git"  $gitName  -}}
+{{- $email := promptStringOnce . "email"       "Tu email para git"   $gitEmail -}}
+{{- $gh    := promptStringOnce . "github_user" "Tu usuario de GitHub" $ghUser  -}}
+
+{{- /* --- Preferencias --- */ -}}
+{{- $editor := promptStringOnce . "editor" "Editor por defecto (nvim/vim/micro/nano)" $anEditor -}}
+{{- $rebase := promptBoolOnce   . "git_rebase" "¿`git pull` con rebase en vez de merge?" false -}}
+{{- $branch := promptStringOnce . "git_branch" "Rama por defecto en repos nuevos" "main" -}}
+
+{{- /* --- Qué instalar --- */ -}}
+{{- $docker := promptBoolOnce . "docker" "¿Instalar Docker?"                     true  -}}
+{{- $k8s    := promptBoolOnce . "k8s"    "¿Aliases de Kubernetes (kubectl)?"     false -}}
+{{- $ai     := promptBoolOnce . "ai"     "¿Aliases de agentes de IA (claude, codex)?" false -}}
+
+{{- /* --- Autodetectado --- */ -}}
 {{- $wsl := false -}}
 {{- if hasKey .chezmoi "kernel" -}}
 {{-   $wsl = contains "microsoft" (.chezmoi.kernel.osrelease | lower) -}}
 {{- end -}}
 
 [data]
-    name  = {{ $name  | quote }}
-    email = {{ $email | quote }}
-    wsl   = {{ $wsl }}
+    name        = {{ $name   | quote }}
+    email       = {{ $email  | quote }}
+    github_user = {{ $gh     | quote }}
+    editor      = {{ $editor | quote }}
+    git_rebase  = {{ $rebase }}
+    git_branch  = {{ $branch | quote }}
+    docker      = {{ $docker }}
+    k8s         = {{ $k8s }}
+    ai          = {{ $ai }}
+    wsl         = {{ $wsl }}
