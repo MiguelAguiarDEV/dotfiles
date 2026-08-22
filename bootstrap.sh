@@ -137,20 +137,19 @@ else
   note "se conservan los datos ya guardados"
 fi
 
-# Estos valores alimentan las plantillas del repo; chezmoi los guarda y no
-# vuelve a preguntar en los siguientes `apply`.
+# Las respuestas viajan como variables de entorno, que .chezmoi.toml.tmpl usa
+# como valor por defecto de cada prompt; --promptDefaults los acepta sin
+# volver a preguntar. No se usa --promptString porque ese flag se indexa por el
+# TEXTO del prompt, y reescribir una pregunta romperia esto en silencio.
 PROMPTS=()
-(( RECONFIG )) && PROMPTS=(
-  --promptString "name=$W_NAME"
-  --promptString "email=$W_EMAIL"
-  --promptString "github_user=$W_GH"
-  --promptString "editor=$W_EDITOR"
-  --promptString "git_branch=$W_BRANCH"
-  --promptBool   "git_rebase=$W_REBASE"
-  --promptBool   "docker=$W_DOCKER"
-  --promptBool   "k8s=$W_K8S"
-  --promptBool   "ai=$W_AI"
-)
+if (( RECONFIG )); then
+  export DOTFILES_NAME="$W_NAME"     DOTFILES_EMAIL="$W_EMAIL"
+  export DOTFILES_GH="$W_GH"         DOTFILES_EDITOR="$W_EDITOR"
+  export DOTFILES_BRANCH="$W_BRANCH" DOTFILES_REBASE="$W_REBASE"
+  export DOTFILES_DOCKER="$W_DOCKER" DOTFILES_K8S="$W_K8S"
+  export DOTFILES_AI="$W_AI"
+  PROMPTS=(--promptDefaults)
+fi
 
 # ==========================================================================
 say "4/6 · Repo de dotfiles"

@@ -137,13 +137,16 @@ Para responder sin interacción:
 chezmoi init --apply --promptDefaults https://github.com/MiguelAguiarDEV/dotfiles.git
 ```
 
-O fijando valores concretos:
+O fijando valores concretos, que es lo que hace `bootstrap.sh` por dentro:
 
 ```bash
-chezmoi init --apply \
-  --promptString name="Tu Nombre" --promptString email=tu@correo.com \
-  --promptBool k8s=true https://github.com/MiguelAguiarDEV/dotfiles.git
+DOTFILES_NAME="Tu Nombre" DOTFILES_EMAIL=tu@correo.com DOTFILES_K8S=true \
+  chezmoi init --apply --promptDefaults \
+  https://github.com/MiguelAguiarDEV/dotfiles.git
 ```
+
+Las variables son `DOTFILES_` + `NAME`, `EMAIL`, `GH`, `EDITOR`, `BRANCH`,
+`REBASE`, `DOCKER`, `K8S`, `AI`. Los booleanos aceptan `true` o `false`.
 
 ## Secrets
 

@@ -1,10 +1,14 @@
 {{/* Configuración de la máquina — se resuelve UNA vez en `chezmoi init` y queda
      guardada en ~/.config/chezmoi/chezmoi.toml.
 
-     `bootstrap.sh` hace estas mismas preguntas con una interfaz más cómoda y
-     las pasa con `--promptString` / `--promptBool`, así que en el flujo normal
-     nada de esto llega a preguntarse aquí. Estos prompts son el camino de
-     respaldo para quien use `chezmoi init` a pelo.
+     `bootstrap.sh` hace estas mismas preguntas con una interfaz más cómoda,
+     exporta las respuestas como DOTFILES_* y llama con `--promptDefaults`, así
+     que en el flujo normal nada de esto llega a preguntarse aquí. Estos
+     prompts son el camino de respaldo para quien use `chezmoi init` a pelo.
+
+     Se usan variables de entorno y no `--promptString`: ese flag se indexa por
+     el TEXTO del prompt, así que reescribir una pregunta romperia el bootstrap
+     en silencio.
 
      Los defaults salen de `sh -c "... || true"` y no de `output "git" ...` a
      secas: `git config --get` devuelve 1 cuando la clave no existe, y eso
@@ -18,20 +22,25 @@
 {{- end -}}
 {{- if eq $anEditor "" }}{{ $anEditor = "vim" }}{{ end -}}
 
+{{- /* Cada default sale de su DOTFILES_*, y si no está, de lo detectado.
+       Para los booleanos se compara contra la cadena "true" en vez de usar
+       `default`: sprig considera vacío el false booleano, así que
+       `... | default true` convertiría un false explícito en true. */ -}}
+
 {{- /* --- Identidad --- */ -}}
-{{- $name  := promptStringOnce . "name"        "Tu nombre para git"  $gitName  -}}
-{{- $email := promptStringOnce . "email"       "Tu email para git"   $gitEmail -}}
-{{- $gh    := promptStringOnce . "github_user" "Tu usuario de GitHub" $ghUser  -}}
+{{- $name  := promptStringOnce . "name"        "Tu nombre para git"   (env "DOTFILES_NAME"   | default $gitName)  -}}
+{{- $email := promptStringOnce . "email"       "Tu email para git"    (env "DOTFILES_EMAIL"  | default $gitEmail) -}}
+{{- $gh    := promptStringOnce . "github_user" "Tu usuario de GitHub" (env "DOTFILES_GH"     | default $ghUser)   -}}
 
 {{- /* --- Preferencias --- */ -}}
-{{- $editor := promptStringOnce . "editor" "Editor por defecto (nvim/vim/micro/nano)" $anEditor -}}
-{{- $rebase := promptBoolOnce   . "git_rebase" "¿`git pull` con rebase en vez de merge?" false -}}
-{{- $branch := promptStringOnce . "git_branch" "Rama por defecto en repos nuevos" "main" -}}
+{{- $editor := promptStringOnce . "editor"     "Editor por defecto (nvim/vim/micro/nano)" (env "DOTFILES_EDITOR" | default $anEditor) -}}
+{{- $branch := promptStringOnce . "git_branch" "Rama por defecto en repos nuevos"         (env "DOTFILES_BRANCH" | default "main")    -}}
+{{- $rebase := promptBoolOnce   . "git_rebase" "¿`git pull` con rebase en vez de merge?"  (eq (env "DOTFILES_REBASE" | default "false") "true") -}}
 
 {{- /* --- Qué instalar --- */ -}}
-{{- $docker := promptBoolOnce . "docker" "¿Instalar Docker?"                     true  -}}
-{{- $k8s    := promptBoolOnce . "k8s"    "¿Aliases de Kubernetes (kubectl)?"     false -}}
-{{- $ai     := promptBoolOnce . "ai"     "¿Aliases de agentes de IA (claude, codex)?" false -}}
+{{- $docker := promptBoolOnce . "docker" "¿Instalar Docker?"                          (eq (env "DOTFILES_DOCKER" | default "true")  "true")  -}}
+{{- $k8s    := promptBoolOnce . "k8s"    "¿Aliases de Kubernetes (kubectl)?"          (eq (env "DOTFILES_K8S"    | default "false") "true") -}}
+{{- $ai     := promptBoolOnce . "ai"     "¿Aliases de agentes de IA (claude, codex)?" (eq (env "DOTFILES_AI"     | default "false") "true") -}}
 
 {{- /* --- Autodetectado --- */ -}}
 {{- $wsl := false -}}
