@@ -56,9 +56,12 @@ máquina virtual, y el de Linux tu identidad de git, editor y lenguajes.
   Configurar Terminal      [S/n]
 ```
 
-Los recursos solo se preguntan si no tenías ya un `.wslconfig`. El modo espejo
-comparte el loopback con Windows, pero rompe algunas VPN corporativas: si
-respondes que no, se deja la red en NAT.
+Si ya tenías un `.wslconfig`, el asistente **te enseña lo que hay dentro** y
+pregunta si sobrescribirlo, con **no** por defecto. Solo entonces pide los
+recursos, y guarda una copia del anterior antes de escribir.
+
+El modo espejo comparte el loopback con Windows, pero rompe algunas VPN
+corporativas: si respondes que no, se deja la red en NAT.
 
 Es idempotente y detecta lo que ya está hecho. Si Windows aún no tenía WSL hará
 falta **un reinicio**: el script lo dice y, al volver a ejecutarlo, continúa por

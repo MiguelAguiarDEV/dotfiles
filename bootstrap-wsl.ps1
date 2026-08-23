@@ -135,11 +135,21 @@ Write-Host ""
 Write-Host "  Sistema" -ForegroundColor Cyan
 $Distro = Field "Distribucion" $Distro
 
+$W_WriteConfig = $true
 if ($haveWslConfig) {
     Write-Host ""
-    Note "Ya existe $wslConfig; no se toca, asi que no se preguntan recursos."
-    $W_Mirror = $null
-} else {
+    Write-Host "  Ya tienes un .wslconfig" -ForegroundColor Cyan
+    Note $wslConfig
+    # Se ensena lo que hay antes de preguntar: sobrescribir a ciegas un fichero
+    # que alguien ajusto a mano es justo lo que no debe hacer un instalador.
+    Get-Content $wslConfig |
+        Where-Object { $_ -match '^\s*(memory|processors|swap|networkingMode|dnsTunneling|autoProxy|hostAddressLoopback)\s*=' } |
+        ForEach-Object { Write-Host ("      " + $_.Trim()) -ForegroundColor DarkGray }
+    $W_WriteConfig = YesNo "Sobrescribirlo" $false
+    if (-not $W_WriteConfig) { Note "se conserva tal cual" }
+}
+
+if ($W_WriteConfig) {
     Write-Host ""
     Write-Host "  Recursos de WSL" -ForegroundColor Cyan
     Note "Detectado: ${totalGb}GB de RAM, $cpus CPUs"
@@ -186,10 +196,14 @@ Ok "WSL2 listo"
 # ============================================================ 2. .wslconfig
 Say "3/7 · Configuracion de WSL (.wslconfig)"
 
-if ($haveWslConfig) {
-    Ok "ya existe $wslConfig (no se toca)"
-    Note "borralo y re-ejecuta si quieres el de referencia"
+if (-not $W_WriteConfig) {
+    Ok "conservado el $wslConfig que ya tenias"
 } else {
+    if ($haveWslConfig) {
+        $bak = "$wslConfig.bak-$(Get-Date -f yyyyMMddHHmmss)"
+        Copy-Item $wslConfig $bak -Force
+        Note "copia del anterior en $bak"
+    }
     $net = if ($W_Mirror) { @"
 
 # Modo espejo: WSL replica las interfaces de Windows en vez de vivir tras un
