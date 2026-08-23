@@ -27,12 +27,38 @@ irm https://raw.githubusercontent.com/MiguelAguiarDEV/dotfiles/main/bootstrap-ws
 
 | Paso | Qué hace |
 |---|---|
-| 1 · WSL2 | Habilita las features de Windows y actualiza el kernel |
-| 2 · `.wslconfig` | Memoria (la mitad de la RAM), CPUs, swap, `autoMemoryReclaim`, red en modo espejo |
-| 3 · Ubuntu | La instala y crea tu usuario con contraseña y `sudo`, sin el asistente interactivo |
-| 4 · Fuente | JetBrainsMono Nerd Font en tu perfil (sin permisos de máquina) |
-| 5 · Terminal | Fuente, tema oscuro, y el perfil de WSL por defecto arrancando en `~` |
-| 6 · Dotfiles | Lanza `bootstrap.sh` dentro de WSL, con su asistente |
+| 1 · **Asistente** | Pregunta distro, recursos de WSL, red y qué tocar en Windows |
+| 2 · WSL2 | Habilita las features de Windows y actualiza el kernel |
+| 3 · `.wslconfig` | Escribe lo que respondiste; si el fichero ya existe, no lo toca |
+| 4 · Ubuntu | La instala y crea tu usuario con contraseña y `sudo`, sin el asistente interactivo |
+| 5 · Fuente | JetBrainsMono Nerd Font en tu perfil (sin permisos de máquina) |
+| 6 · Terminal | Fuente, tema oscuro, y el perfil de WSL por defecto arrancando en `~` |
+| 7 · Dotfiles | Lanza `bootstrap.sh` dentro de WSL, con **su** asistente |
+
+Son dos asistentes porque cada uno pregunta lo suyo: el de Windows cubre la
+máquina virtual, y el de Linux tu identidad de git, editor y lenguajes.
+
+```
+  Sistema
+  Distribucion             [Ubuntu-24.04]
+
+  Recursos de WSL
+  Detectado: 31GB de RAM, 12 CPUs
+  Memoria (GB)             [15]
+  CPUs                     [12]
+  Swap (GB)                [4]
+
+  Red
+  Modo espejo              [S/n]
+
+  Windows
+  Instalar Nerd Font       [S/n]
+  Configurar Terminal      [S/n]
+```
+
+Los recursos solo se preguntan si no tenías ya un `.wslconfig`. El modo espejo
+comparte el loopback con Windows, pero rompe algunas VPN corporativas: si
+respondes que no, se deja la red en NAT.
 
 Es idempotente y detecta lo que ya está hecho. Si Windows aún no tenía WSL hará
 falta **un reinicio**: el script lo dice y, al volver a ejecutarlo, continúa por

@@ -51,6 +51,32 @@ function Note ($m) { Write-Host "  $m"    -ForegroundColor DarkGray }
 function Warn ($m) { Write-Host "  ⚠ $m"  -ForegroundColor Yellow }
 function Die  ($m) { Write-Host "`n  ✗ $m`n" -ForegroundColor Red; exit 1 }
 
+# --- entrada -------------------------------------------------------------------
+# Enter acepta el valor entre corchetes; se pregunta una sola vez.
+function Field($label, $default) {
+    $l = "  {0,-24}" -f $label
+    if ($default) { Write-Host "$l [$default] " -NoNewline -ForegroundColor White }
+    else          { Write-Host "$l " -NoNewline -ForegroundColor White }
+    $in = Read-Host
+    if ([string]::IsNullOrWhiteSpace($in)) { $default } else { $in.Trim() }
+}
+
+function YesNo($label, $default) {
+    $hint = if ($default) { 'S/n' } else { 's/N' }
+    Write-Host ("  {0,-24} [{1}] " -f $label, $hint) -NoNewline -ForegroundColor White
+    $in = Read-Host
+    switch -Regex ($in) { '^[SsYy]' { $true } '^[Nn]' { $false } default { $default } }
+}
+
+function Num($label, $default, $min, $max) {
+    while ($true) {
+        $v = Field $label $default
+        $n = 0
+        if ([int]::TryParse("$v", [ref]$n) -and $n -ge $min -and $n -le $max) { return $n }
+        Warn "escribe un numero entre $min y $max"
+    }
+}
+
 function Test-Admin {
     $id = [Security.Principal.WindowsIdentity]::GetCurrent()
     (New-Object Security.Principal.WindowsPrincipal $id).IsInRole(
@@ -96,8 +122,45 @@ if (-not (Test-Admin)) {
 }
 
 
+# ============================================================ 0. Wizard
+Say "1/7 · Configuracion"
+
+$totalGb = [math]::Floor((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB)
+$cpus    = [Environment]::ProcessorCount
+$wslConfig = Join-Path $env:USERPROFILE '.wslconfig'
+$haveWslConfig = Test-Path $wslConfig
+
+Note "Enter acepta el valor entre corchetes."
+Write-Host ""
+Write-Host "  Sistema" -ForegroundColor Cyan
+$Distro = Field "Distribucion" $Distro
+
+if ($haveWslConfig) {
+    Write-Host ""
+    Note "Ya existe $wslConfig; no se toca, asi que no se preguntan recursos."
+    $W_Mirror = $null
+} else {
+    Write-Host ""
+    Write-Host "  Recursos de WSL" -ForegroundColor Cyan
+    Note "Detectado: ${totalGb}GB de RAM, $cpus CPUs"
+    $W_Mem   = Num   "Memoria (GB)" ([math]::Max(4, [math]::Floor($totalGb / 2))) 2 $totalGb
+    $W_Cpus  = Num   "CPUs"         $cpus 1 $cpus
+    $W_Swap  = Num   "Swap (GB)"    4 0 64
+    Write-Host ""
+    Write-Host "  Red" -ForegroundColor Cyan
+    Note "El modo espejo comparte el loopback con Windows, pero rompe"
+    Note "algunas VPN corporativas. Si usas una, responde que no."
+    $W_Mirror = YesNo "Modo espejo" $true
+}
+
+Write-Host ""
+Write-Host "  Windows" -ForegroundColor Cyan
+$W_Font     = YesNo "Instalar Nerd Font"   $true
+$W_Terminal = if ($SkipTerminal) { $false } else { YesNo "Configurar Terminal" $true }
+Write-Host ""
+
 # ============================================================ 1. Features
-Say "1/6 · WSL2"
+Say "2/7 · WSL2"
 
 $needReboot = $false
 foreach ($f in 'Microsoft-Windows-Subsystem-Linux', 'VirtualMachinePlatform') {
@@ -121,43 +184,45 @@ try { & wsl.exe --update --web-download 2>&1 | Out-Null } catch {}
 Ok "WSL2 listo"
 
 # ============================================================ 2. .wslconfig
-Say "2/6 · Configuracion de WSL (.wslconfig)"
+Say "3/7 · Configuracion de WSL (.wslconfig)"
 
-$wslConfig = Join-Path $env:USERPROFILE '.wslconfig'
-if (Test-Path $wslConfig) {
+if ($haveWslConfig) {
     Ok "ya existe $wslConfig (no se toca)"
     Note "borralo y re-ejecuta si quieres el de referencia"
 } else {
-    # La mitad de la RAM, redondeada hacia abajo, con un minimo de 4 GB: WSL2
-    # crece hasta el limite y no siempre devuelve la memoria a Windows.
-    $totalGb = [math]::Floor((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB)
-    $memGb   = [math]::Max(4, [math]::Floor($totalGb / 2))
-    @"
-[wsl2]
-memory=${memGb}GB
-processors=$([Environment]::ProcessorCount)
-swap=4GB
-
-# Devuelve memoria a Windows en vez de retenerla hasta el reinicio.
-autoMemoryReclaim=gradual
-# El disco virtual no crece de forma indefinida.
-sparseVhd=true
+    $net = if ($W_Mirror) { @"
 
 # Modo espejo: WSL replica las interfaces de Windows en vez de vivir tras un
-# NAT, y comparten loopback. Si usas una VPN corporativa y algo deja de
-# resolver, comenta esta linea y las dos siguientes.
+# NAT, y comparten loopback. Si una VPN deja de resolver, comenta estas tres.
 networkingMode=mirrored
 dnsTunneling=true
 autoProxy=true
 
 [experimental]
 hostAddressLoopback=true
+"@ } else { @"
+
+# Red en NAT (el valor por defecto de WSL): mas compatible con VPN corporativas.
+# Para hablar con servicios de Windows desde Linux por 127.0.0.1 haria falta
+# networkingMode=mirrored.
+"@ }
+    @"
+[wsl2]
+memory=${W_Mem}GB
+processors=$W_Cpus
+swap=${W_Swap}GB
+
+# Devuelve memoria a Windows en vez de retenerla hasta el reinicio.
+autoMemoryReclaim=gradual
+# El disco virtual no crece de forma indefinida.
+sparseVhd=true
+$net
 "@ | Set-Content -Path $wslConfig -Encoding UTF8
-    Ok "escrito $wslConfig (${memGb}GB RAM, $([Environment]::ProcessorCount) CPUs)"
+    Ok "escrito $wslConfig (${W_Mem}GB RAM, $W_Cpus CPUs, ${W_Swap}GB swap)"
 }
 
 # ============================================================ 3. Distro
-Say "3/6 · $Distro"
+Say "4/7 · $Distro"
 
 $installed = @(Invoke-WslCli @('--list','--quiet') |
                ForEach-Object { $_.Trim() } | Where-Object { $_ })
@@ -249,7 +314,7 @@ if ($userExists) {
 }
 
 # ============================================================ 4. Fuente
-Say "4/6 · JetBrainsMono Nerd Font"
+Say "5/7 · JetBrainsMono Nerd Font"
 
 $fontDir = Join-Path $env:LOCALAPPDATA 'Microsoft\Windows\Fonts'
 $fontKey = 'HKCU:\Software\Microsoft\Windows NT\CurrentVersion\Fonts'
@@ -260,7 +325,9 @@ $faces   = @{
     'JetBrainsMonoNerdFont-BoldItalic.ttf' = 'JetBrainsMono Nerd Font Bold Italic (TrueType)'
 }
 
-if (Test-Path (Join-Path $fontDir 'JetBrainsMonoNerdFont-Regular.ttf')) {
+if (-not $W_Font) {
+    Note "omitida a peticion tuya"
+} elseif (Test-Path (Join-Path $fontDir 'JetBrainsMonoNerdFont-Regular.ttf')) {
     Ok "ya instalada"
 } else {
     Note "descargando (~130 MB)…"
@@ -291,10 +358,10 @@ if (Test-Path (Join-Path $fontDir 'JetBrainsMonoNerdFont-Regular.ttf')) {
 }
 
 # ============================================================ 5. Terminal
-Say "5/6 · Windows Terminal"
+Say "6/7 · Windows Terminal"
 
-if ($SkipTerminal) {
-    Note "omitido por -SkipTerminal"
+if (-not $W_Terminal) {
+    Note "omitido a peticion tuya"
 } else {
     $wtSettings = Join-Path $env:LOCALAPPDATA `
         'Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json'
@@ -360,7 +427,7 @@ if ($SkipTerminal) {
 }
 
 # ============================================================ 6. Dotfiles
-Say "6/6 · Dotfiles"
+Say "7/7 · Dotfiles"
 
 Note "a partir de aqui manda el asistente de Linux: te preguntara tus datos."
 Write-Host ""
