@@ -195,6 +195,31 @@ if ! have uv; then
 fi
 {{ end }}
 
+{{ if .claude }}
+# --- Claude Code y las skills propias -------------------------------------
+# El instalador oficial deja el binario en ~/.local/bin, sin sudo.
+if ! have claude; then
+    echo "==> claude code"
+    curl -fsSL https://claude.ai/install.sh | bash >/dev/null 2>&1 \
+        || echo "WARN: no se pudo instalar claude code"
+fi
+
+# El marketplace de skills propias. `claude plugin` falla si ya estan anadidos,
+# de ahi los `|| true`: el objetivo es que existan, no que sea la primera vez.
+if have claude || [ -x "$BIN/claude" ]; then
+    CLAUDE_BIN="$(command -v claude || echo "$BIN/claude")"
+    if ! "$CLAUDE_BIN" plugin marketplace list 2>/dev/null | grep -q 'miguelaguiardev-skills'; then
+        echo "    anadiendo el marketplace de skills"
+        "$CLAUDE_BIN" plugin marketplace add MiguelAguiarDEV/skills >/dev/null 2>&1 || true
+    fi
+    if ! "$CLAUDE_BIN" plugin list 2>/dev/null | grep -q 'toolkit'; then
+        echo "    instalando el plugin toolkit"
+        "$CLAUDE_BIN" plugin install toolkit@miguelaguiardev-skills --yes >/dev/null 2>&1 \
+            || echo "WARN: no se pudo instalar el plugin toolkit"
+    fi
+fi
+{{ end }}
+
 # --- lazygit y lazydocker: binarios de GitHub, no estan en apt -------------
 gh_binary() {   # gh_binary <repo> <nombre> <patron-del-asset>
     local repo="$1" name="$2" pattern="$3" url tmp

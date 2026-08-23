@@ -42,6 +42,7 @@
 {{- $rust   := promptBoolOnce . "lang_rust" "¿Instalar Rust (rustup)?"                (eq (env "DOTFILES_RUST"   | default "true")  "true")  -}}
 {{- $node   := promptBoolOnce . "lang_node" "¿Instalar Node (nvm + LTS)?"             (eq (env "DOTFILES_NODE"   | default "true")  "true")  -}}
 {{- $python := promptBoolOnce . "lang_python" "¿Instalar Python (+ uv)?"              (eq (env "DOTFILES_PYTHON" | default "true")  "true")  -}}
+{{- $claude := promptBoolOnce . "claude" "¿Instalar Claude Code (+ tus skills)?"     (eq (env "DOTFILES_CLAUDE" | default "true")  "true")  -}}
 {{- $docker := promptBoolOnce . "docker" "¿Instalar Docker?"                          (eq (env "DOTFILES_DOCKER" | default "true")  "true")  -}}
 {{- $k8s    := promptBoolOnce . "k8s"    "¿Aliases de Kubernetes (kubectl)?"          (eq (env "DOTFILES_K8S"    | default "false") "true") -}}
 {{- $ai     := promptBoolOnce . "ai"     "¿Aliases de agentes de IA (claude, codex)?" (eq (env "DOTFILES_AI"     | default "false") "true") -}}
@@ -63,6 +64,7 @@
     lang_rust   = {{ $rust }}
     lang_node   = {{ $node }}
     lang_python = {{ $python }}
+    claude      = {{ $claude }}
     docker      = {{ $docker }}
     k8s         = {{ $k8s }}
     ai          = {{ $ai }}

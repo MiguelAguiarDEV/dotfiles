@@ -136,7 +136,8 @@ Enter lo acepta.
 | | Rama por defecto | `main` | `git init.defaultBranch` |
 | | `git pull --rebase` | no | `git pull.rebase` |
 | **Lenguajes** | Go · Rust · Node · Python | sí los cuatro | instalados bajo `$HOME`, sin `sudo` |
-| **Qué más** | Docker | sí | filtra los paquetes de docker de las listas |
+| **Qué más** | Claude Code + skills | sí | el CLI, más el marketplace y el plugin `toolkit` |
+| | Docker | sí | filtra los paquetes de docker de las listas |
 | | Aliases de Kubernetes | no | despliega o no `~/.aliases/30-kubectl.sh` |
 | | Aliases de agentes IA | no | despliega o no `~/.aliases/60-ai.sh` |
 
@@ -186,6 +187,7 @@ toque. Además instala lo que no está empaquetado, en `~/.local/bin` y sin
 | **neovim** | Ubuntu 24.04 trae 0.9.5 y la config necesita 0.11+; se baja el tarball oficial |
 | **eza** | No está en Debian ni Ubuntu; se añade el repo del proyecto |
 | **lazygit**, **lazydocker** | Solo publican binarios en GitHub |
+| **Claude Code** | Instalador oficial → `~/.local/bin`. Añade además el marketplace [`MiguelAguiarDEV/skills`](https://github.com/MiguelAguiarDEV/skills) y su plugin `toolkit` |
 
 ### Lenguajes
 
@@ -230,7 +232,7 @@ DOTFILES_NAME="Tu Nombre" DOTFILES_EMAIL=tu@correo.com DOTFILES_K8S=true \
 ```
 
 Las variables son `DOTFILES_` + `NAME`, `EMAIL`, `GH`, `EDITOR`, `BRANCH`,
-`REBASE`, `GO`, `RUST`, `NODE`, `PYTHON`, `DOCKER`, `K8S`, `AI`. Los booleanos
+`REBASE`, `GO`, `RUST`, `NODE`, `PYTHON`, `CLAUDE`, `DOCKER`, `K8S`, `AI`. Los booleanos
 aceptan `true` o `false`.
 
 ## Secrets
