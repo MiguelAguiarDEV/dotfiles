@@ -243,6 +243,11 @@ if ($W_ConfigMode -ne 'skip') {
     Write-Host "  Recursos de WSL" -ForegroundColor Cyan
     Note "Detectado: ${totalGb}GB de RAM, $cpus CPUs"
     $W_Mem   = Num   "Memoria (GB)" $defMem  2 $totalGb
+    # Lo que WSL toma se lo quita a Windows: mejor verlo antes de seguir que
+    # descubrirlo cuando el escritorio empieza a tirar de swap.
+    $left = $totalGb - $W_Mem
+    if ($left -lt 4) { Warn "a Windows solo le quedarian ${left}GB; puede ir justo" }
+    else             { Note "a Windows le quedan ${left}GB" }
     $W_Cpus  = Num   "CPUs"         $defCpus 1 $cpus
     $W_Swap  = Num   "Swap (GB)"    $defSwap 0 64
     Write-Host ""
