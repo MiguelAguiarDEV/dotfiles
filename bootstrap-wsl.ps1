@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
   Deja un Windows recien instalado con WSL2 + Ubuntu + estos dotfiles.
 
@@ -41,15 +41,21 @@ param(
     [switch]$SkipTerminal
 )
 
+# Todo el fichero es ASCII puro y NO lleva BOM, a proposito:
+#   - `irm ... | iex` evalua el contenido como cadena, y un BOM al principio
+#     impide que se reconozca el `<#` de la ayuda: su texto pasa a leerse como
+#     codigo y PowerShell muere con "Unexpected token".
+#   - sin BOM, PowerShell 5.1 lee los .ps1 como ANSI, lo que destrozaria
+#     cualquier caracter no ASCII. Por eso aqui no hay ninguno.
 $ErrorActionPreference = 'Stop'
 $RepoRaw = 'https://raw.githubusercontent.com/MiguelAguiarDEV/dotfiles/main'
 
 # ---------------------------------------------------------------- presentacion
-function Say  ($m) { Write-Host "`n▸ $m" -ForegroundColor Cyan }
-function Ok   ($m) { Write-Host "  ✓ $m"  -ForegroundColor Green }
+function Say  ($m) { Write-Host "`n> $m" -ForegroundColor Cyan }
+function Ok   ($m) { Write-Host "  [ok] $m"  -ForegroundColor Green }
 function Note ($m) { Write-Host "  $m"    -ForegroundColor DarkGray }
-function Warn ($m) { Write-Host "  ⚠ $m"  -ForegroundColor Yellow }
-function Die  ($m) { Write-Host "`n  ✗ $m`n" -ForegroundColor Red; exit 1 }
+function Warn ($m) { Write-Host "  [!] $m"  -ForegroundColor Yellow }
+function Die  ($m) { Write-Host "`n  [x] $m`n" -ForegroundColor Red; exit 1 }
 
 # --- entrada -------------------------------------------------------------------
 # Enter acepta el valor entre corchetes; se pregunta una sola vez.
@@ -161,7 +167,7 @@ function Test-Admin {
 # Y el parametro no puede llamarse $Args: es una variable automatica, y el
 # splatting `@Args` usaria esa en vez de la del parametro.
 
-# Para subcomandos de wsl.exe (--list, --status…), que salen en UTF-16LE.
+# Para subcomandos de wsl.exe (--list, --status...), que salen en UTF-16LE.
 function Invoke-WslCli([string[]]$WslArgs) {
     $prev = [Console]::OutputEncoding
     try {
@@ -181,7 +187,7 @@ function Invoke-WslCmd([string[]]$WslArgs) {
 
 Write-Host ""
 Write-Host "  Instalador de WSL + dotfiles" -ForegroundColor White
-Write-Host "  6 pasos · idempotente: se puede re-ejecutar" -ForegroundColor DarkGray
+Write-Host "  6 pasos - idempotente: se puede re-ejecutar" -ForegroundColor DarkGray
 
 if (-not (Test-Admin)) {
     Die "Hace falta PowerShell como administrador (los pasos 1 y 2 tocan features de Windows).`n     Boton derecho en PowerShell -> Ejecutar como administrador."
@@ -189,7 +195,7 @@ if (-not (Test-Admin)) {
 
 
 # ============================================================ 0. Wizard
-Say "1/7 · Configuracion"
+Say "1/7 - Configuracion"
 
 $totalGb = [math]::Floor((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB)
 $cpus    = [Environment]::ProcessorCount
@@ -264,13 +270,13 @@ $W_Terminal = if ($SkipTerminal) { $false } else { YesNo "Configurar Terminal" $
 Write-Host ""
 
 # ============================================================ 1. Features
-Say "2/7 · WSL2"
+Say "2/7 - WSL2"
 
 $needReboot = $false
 foreach ($f in 'Microsoft-Windows-Subsystem-Linux', 'VirtualMachinePlatform') {
     $state = (Get-WindowsOptionalFeature -Online -FeatureName $f).State
     if ($state -ne 'Enabled') {
-        Note "habilitando $f…"
+        Note "habilitando $f..."
         $r = Enable-WindowsOptionalFeature -Online -FeatureName $f -NoRestart -All
         if ($r.RestartNeeded) { $needReboot = $true }
     } else { Ok "$f ya habilitado" }
@@ -288,7 +294,7 @@ try { & wsl.exe --update --web-download 2>&1 | Out-Null } catch {}
 Ok "WSL2 listo"
 
 # ============================================================ 2. .wslconfig
-Say "3/7 · Configuracion de WSL (.wslconfig)"
+Say "3/7 - Configuracion de WSL (.wslconfig)"
 
 if ($W_ConfigMode -eq 'skip') {
     Ok "conservado el $wslConfig que ya tenias"
@@ -347,7 +353,7 @@ if ($W_ConfigMode -eq 'skip') {
 }
 
 # ============================================================ 3. Distro
-Say "4/7 · $Distro"
+Say "4/7 - $Distro"
 
 $installed = @(Invoke-WslCli @('--list','--quiet') |
                ForEach-Object { $_.Trim() } | Where-Object { $_ })
@@ -366,7 +372,7 @@ if ($installed -notcontains $Distro) {
 if ($installed -contains $Distro) {
     Ok "$Distro ya instalada"
 } else {
-    Note "descargando e instalando (unos minutos)…"
+    Note "descargando e instalando (unos minutos)..."
     # --no-launch evita el asistente interactivo de creacion de usuario: aqui
     # se crea despues, sin depender de que alguien conteste en una consola.
     & wsl.exe --install -d $Distro --no-launch
@@ -439,7 +445,7 @@ if ($userExists) {
 }
 
 # ============================================================ 4. Fuente
-Say "5/7 · JetBrainsMono Nerd Font"
+Say "5/7 - JetBrainsMono Nerd Font"
 
 $fontDir = Join-Path $env:LOCALAPPDATA 'Microsoft\Windows\Fonts'
 $fontKey = 'HKCU:\Software\Microsoft\Windows NT\CurrentVersion\Fonts'
@@ -455,7 +461,7 @@ if (-not $W_Font) {
 } elseif (Test-Path (Join-Path $fontDir 'JetBrainsMonoNerdFont-Regular.ttf')) {
     Ok "ya instalada"
 } else {
-    Note "descargando (~130 MB)…"
+    Note "descargando (~130 MB)..."
     $tmp = Join-Path $env:TEMP "nf-$([guid]::NewGuid())"
     New-Item -ItemType Directory -Path $tmp -Force | Out-Null
     try {
@@ -483,7 +489,7 @@ if (-not $W_Font) {
 }
 
 # ============================================================ 5. Terminal
-Say "6/7 · Windows Terminal"
+Say "6/7 - Windows Terminal"
 
 if (-not $W_Terminal) {
     Note "omitido a peticion tuya"
@@ -552,7 +558,7 @@ if (-not $W_Terminal) {
 }
 
 # ============================================================ 6. Dotfiles
-Say "7/7 · Dotfiles"
+Say "7/7 - Dotfiles"
 
 Note "a partir de aqui manda el asistente de Linux: te preguntara tus datos."
 Write-Host ""
@@ -562,7 +568,7 @@ Write-Host ""
     "bash <(curl -fsSL '$RepoRaw/bootstrap.sh?`$(date +%s)')"
 
 Write-Host ""
-Write-Host "  ✓ Listo" -ForegroundColor Green
+Write-Host "  [ok] Listo" -ForegroundColor Green
 Note "Abre Windows Terminal: deberia entrar directo en $Distro, con el prompt nuevo."
 Note "Si los iconos salen como cuadrados, cierra Windows Terminal del todo y reabrelo."
 Write-Host ""
