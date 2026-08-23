@@ -25,6 +25,13 @@ dotfiles. **En PowerShell como administrador:**
 irm https://raw.githubusercontent.com/MiguelAguiarDEV/dotfiles/main/bootstrap-wsl.ps1 | iex
 ```
 
+> **Si acabas de subir un cambio y no lo ves**, el CDN de GitHub cachea los
+> `raw` unos minutos. Para forzar la versión actual:
+>
+> ```powershell
+> iex (irm "https://raw.githubusercontent.com/MiguelAguiarDEV/dotfiles/main/bootstrap-wsl.ps1?v=$(Get-Random)")
+> ```
+
 | Paso | Qué hace |
 |---|---|
 | 1 · **Asistente** | Pregunta distro, recursos de WSL, red y qué tocar en Windows |
