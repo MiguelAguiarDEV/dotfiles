@@ -16,13 +16,13 @@ chezmoi                 plantillas por máquina, sin condicionales por hostname
 
 Arranque medido: **295 ms** en zsh, **133 ms** en bash.
 
-## Windows: de cero a todo listo
+## Desde Windows: instalar WSL y todo lo demás
 
 Un solo script deja un Windows recién instalado con WSL2, Ubuntu y estos
 dotfiles. **En PowerShell como administrador:**
 
 ```powershell
-irm https://raw.githubusercontent.com/MiguelAguiarDEV/dotfiles/main/install-windows.ps1 | iex
+irm https://raw.githubusercontent.com/MiguelAguiarDEV/dotfiles/main/bootstrap-wsl.ps1 | iex
 ```
 
 | Paso | Qué hace |
@@ -41,7 +41,7 @@ otra en paralelo.
 
 ```powershell
 # opciones
-.\install-windows.ps1 -User miguel -Distro Ubuntu-24.04 -SkipTerminal
+.\bootstrap-wsl.ps1 -User miguel -Distro Ubuntu-24.04 -SkipTerminal
 ```
 
 ## Probar sin instalar nada

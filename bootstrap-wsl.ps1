@@ -28,11 +28,11 @@
 
 .EXAMPLE
   # Desde PowerShell COMO ADMINISTRADOR:
-  irm https://raw.githubusercontent.com/MiguelAguiarDEV/dotfiles/main/install-windows.ps1 | iex
+  irm https://raw.githubusercontent.com/MiguelAguiarDEV/dotfiles/main/bootstrap-wsl.ps1 | iex
 
 .EXAMPLE
   # Con un usuario concreto, habiendo descargado el fichero:
-  .\install-windows.ps1 -User miguel
+  .\bootstrap-wsl.ps1 -User miguel
 #>
 [CmdletBinding()]
 param(
