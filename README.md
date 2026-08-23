@@ -36,8 +36,13 @@ irm https://raw.githubusercontent.com/MiguelAguiarDEV/dotfiles/main/bootstrap-ws
 
 Es idempotente y detecta lo que ya está hecho. Si Windows aún no tenía WSL hará
 falta **un reinicio**: el script lo dice y, al volver a ejecutarlo, continúa por
-donde iba. Si ya tienes una Ubuntu registrada, la reutiliza en vez de instalar
-otra en paralelo.
+donde iba.
+
+Sobre una máquina que ya estaba en marcha no duplica nada: si ya tienes una
+Ubuntu registrada la reutiliza en vez de instalar otra, y si esa distro ya tiene
+un usuario normal usa ese en lugar de crear uno nuevo. Solo pregunta el nombre
+de usuario cuando la distro está recién instalada, proponiendo el de Windows
+saneado a un nombre válido en Linux.
 
 ```powershell
 # opciones

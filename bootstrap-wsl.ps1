@@ -17,8 +17,8 @@
   volver a ejecutarlo continua por donde iba.
 
 .PARAMETER User
-  Usuario de Linux a crear. Por defecto, tu nombre de usuario de Windows en
-  minusculas.
+  Usuario de Linux. Si la distro ya tiene uno, se reutiliza; si no, se
+  pregunta proponiendo tu nombre de Windows en minusculas.
 
 .PARAMETER Distro
   Distribucion a instalar. Por defecto Ubuntu-24.04.
@@ -95,8 +95,6 @@ if (-not (Test-Admin)) {
     Die "Hace falta PowerShell como administrador (los pasos 1 y 2 tocan features de Windows).`n     Boton derecho en PowerShell -> Ejecutar como administrador."
 }
 
-if (-not $User) { $User = $env:USERNAME.ToLower() -replace '[^a-z0-9_-]', '' }
-if (-not $User) { Die "No se pudo deducir un nombre de usuario valido; pasa -User" }
 
 # ============================================================ 1. Features
 Say "1/6 · WSL2"
@@ -187,6 +185,41 @@ if ($installed -contains $Distro) {
 }
 
 # --- usuario -----------------------------------------------------------------
+# Si la distro ya tiene un usuario normal, se usa ESE. Deducirlo del nombre de
+# Windows crearia un segundo usuario en una maquina que ya estaba en marcha, con
+# otro $HOME y sin nada de lo que ya hubiera configurado.
+if (-not $User) {
+    # Se lee /etc/passwd entero y se filtra aqui: meter un awk por medio obliga a
+    # anidar comillas de PowerShell y de bash, y el $3 se expande antes de llegar.
+    $existing = @(Invoke-WslCmd @('-d',$Distro,'-u','root','--','cat','/etc/passwd') 2>$null) |
+        ForEach-Object {
+            $f = "$_".Split(':')
+            if ($f.Count -ge 3) {
+                $uid = 0
+                if ([int]::TryParse($f[2], [ref]$uid) -and $uid -ge 1000 -and $uid -lt 65534 `
+                    -and $f[0] -match '^[a-z_][a-z0-9_-]*$') { $f[0] }
+            }
+        } | Select-Object -First 1
+    if ($existing) {
+        $User = $existing
+        Ok "usando el usuario que ya existe en $Distro : '$User'"
+    }
+}
+
+# Sin usuario aun: se propone el de Windows, pero se pregunta. Los nombres de
+# Windows suelen no valer en Linux (mayusculas, espacios, acentos).
+if (-not $User) {
+    $suggested = $env:USERNAME.ToLower() -replace '[^a-z0-9_-]', ''
+    if ($suggested -notmatch '^[a-z_]') { $suggested = "u$suggested" }
+    Note "$Distro no tiene ningun usuario todavia."
+    $answer = Read-Host "  Nombre de usuario para Linux [$suggested]"
+    $User = if ([string]::IsNullOrWhiteSpace($answer)) { $suggested } else { $answer.Trim() }
+}
+
+if ($User -notmatch '^[a-z_][a-z0-9_-]{0,31}$') {
+    Die "'$User' no es un nombre de usuario valido en Linux (minusculas, digitos, - y _)"
+}
+
 $userExists = @(Invoke-WslCmd @('-d',$Distro,'-u','root','--','id','-u',$User) 2>$null) -match '^\d+$'
 if ($userExists) {
     Ok "el usuario '$User' ya existe"
