@@ -56,9 +56,18 @@ máquina virtual, y el de Linux tu identidad de git, editor y lenguajes.
   Configurar Terminal      [S/n]
 ```
 
-Si ya tenías un `.wslconfig`, el asistente **te enseña lo que hay dentro** y
-pregunta si sobrescribirlo, con **no** por defecto. Solo entonces pide los
-recursos, y guarda una copia del anterior antes de escribir.
+Si ya tenías un `.wslconfig`, el asistente **te enseña lo que hay dentro** y da
+a elegir:
+
+| | |
+|---|---|
+| **1** | Conservarlo tal cual |
+| **2** | Actualizar solo esas claves, **respetando tus comentarios** (por defecto) |
+| **3** | Reemplazarlo entero por el de referencia |
+
+Con la opción 2 los valores que ya tuvieras pasan a ser la propuesta por
+defecto, así que puedes cambiarlos o dejarlos con Enter. Siempre guarda una
+copia antes de escribir.
 
 El modo espejo comparte el loopback con Windows, pero rompe algunas VPN
 corporativas: si respondes que no, se deja la red en NAT.

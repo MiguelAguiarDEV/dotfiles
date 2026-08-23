@@ -77,6 +77,72 @@ function Num($label, $default, $min, $max) {
     }
 }
 
+# --- .wslconfig ----------------------------------------------------------------
+# El fichero se lee y se escribe siempre en UTF-8 sin BOM. Get-Content y
+# Set-Content sin -Encoding usan la ANSI del sistema en PowerShell 5.1, que
+# destroza los acentos de los comentarios; y -Encoding UTF8 escribe CON BOM,
+# que aqui no estaba.
+function Read-IniLines([string]$path) {
+    # Sin la coma de "array envuelto": aqui @(...) no la desenvolveria y el
+    # fichero entero acabaria en un unico elemento.
+    [System.IO.File]::ReadAllLines($path, [System.Text.Encoding]::UTF8)
+}
+function Write-IniLines([string]$path, [string[]]$lines) {
+    [System.IO.File]::WriteAllLines($path, $lines, (New-Object System.Text.UTF8Encoding $false))
+}
+
+# Devuelve el valor de una clave del fichero, o $null.
+function Get-IniValue($lines, $key) {
+    foreach ($l in $lines) {
+        if ($l -match "^\s*$key\s*=\s*(.+?)\s*$") { return $Matches[1] }
+    }
+    $null
+}
+
+# Actualiza claves conservando TODO lo demas: comentarios, orden y claves que
+# este script no gestiona. Reemplazar el fichero entero borraria las notas que
+# su dueno haya escrito, que suelen ser justo lo que costo averiguar.
+function Merge-Ini {
+    # IDictionary y no [hashtable]: un [ordered] convertido a hashtable pierde
+    # el orden de insercion, y las claves saldrian barajadas.
+    param([string[]]$Lines, [string]$Section, [System.Collections.IDictionary]$Pairs)
+
+    $out = New-Object System.Collections.Generic.List[string]
+    $out.AddRange([string[]]$Lines)
+
+    # Limites de la seccion: desde su cabecera hasta la siguiente, o el final.
+    $start = -1
+    for ($i = 0; $i -lt $out.Count; $i++) {
+        if ($out[$i] -match "^\s*\[$Section\]\s*$") { $start = $i; break }
+    }
+    if ($start -lt 0) {
+        if ($out.Count -gt 0 -and $out[$out.Count-1].Trim() -ne '') { $out.Add('') }
+        $out.Add("[$Section]")
+        $start = $out.Count - 1
+    }
+    $end = $out.Count
+    for ($i = $start + 1; $i -lt $out.Count; $i++) {
+        if ($out[$i] -match '^\s*\[.+\]\s*$') { $end = $i; break }
+    }
+
+    # $at avanza con cada insercion para que las claves nuevas queden en el
+    # orden en que se pasaron, no del reves.
+    $at = $start + 1
+    foreach ($k in $Pairs.Keys) {
+        $done = $false
+        for ($i = $start + 1; $i -lt $end; $i++) {
+            if ($out[$i] -match "^\s*$k\s*=") { $out[$i] = "$k=$($Pairs[$k])"; $done = $true; break }
+        }
+        if (-not $done) {
+            # Justo tras la cabecera, para que no queden separadas de su seccion
+            # por los comentarios que ya hubiera.
+            $out.Insert($at, "$k=$($Pairs[$k])")
+            $at++; $end++
+        }
+    }
+    $out.ToArray()
+}
+
 function Test-Admin {
     $id = [Security.Principal.WindowsIdentity]::GetCurrent()
     (New-Object Security.Principal.WindowsPrincipal $id).IsInRole(
@@ -135,32 +201,55 @@ Write-Host ""
 Write-Host "  Sistema" -ForegroundColor Cyan
 $Distro = Field "Distribucion" $Distro
 
-$W_WriteConfig = $true
+# 'skip' conservar | 'merge' actualizar claves | 'replace' empezar de cero
+$W_ConfigMode = 'merge'
+$defMem  = [math]::Max(4, [math]::Floor($totalGb / 2))
+$defCpus = $cpus
+$defSwap = 4
+$defMirror = $true
+
 if ($haveWslConfig) {
+    $cur = @(Read-IniLines $wslConfig)
     Write-Host ""
     Write-Host "  Ya tienes un .wslconfig" -ForegroundColor Cyan
     Note $wslConfig
-    # Se ensena lo que hay antes de preguntar: sobrescribir a ciegas un fichero
-    # que alguien ajusto a mano es justo lo que no debe hacer un instalador.
-    Get-Content $wslConfig |
-        Where-Object { $_ -match '^\s*(memory|processors|swap|networkingMode|dnsTunneling|autoProxy|hostAddressLoopback)\s*=' } |
+    # Se ensena lo que hay antes de preguntar: tocar a ciegas un fichero que
+    # alguien ajusto a mano es justo lo que no debe hacer un instalador.
+    $cur | Where-Object { $_ -match '^\s*(memory|processors|swap|networkingMode|dnsTunneling|autoProxy|hostAddressLoopback|autoMemoryReclaim|sparseVhd)\s*=' } |
         ForEach-Object { Write-Host ("      " + $_.Trim()) -ForegroundColor DarkGray }
-    $W_WriteConfig = YesNo "Sobrescribirlo" $false
-    if (-not $W_WriteConfig) { Note "se conserva tal cual" }
+
+    # Los valores que ya estan pasan a ser la propuesta por defecto.
+    $n = 0
+    $v = Get-IniValue $cur 'memory';     if ($v -and [int]::TryParse(($v -replace '(?i)gb'), [ref]$n)) { $defMem  = $n }
+    $v = Get-IniValue $cur 'processors'; if ($v -and [int]::TryParse($v, [ref]$n))                     { $defCpus = $n }
+    $v = Get-IniValue $cur 'swap';       if ($v -and [int]::TryParse(($v -replace '(?i)gb'), [ref]$n)) { $defSwap = $n }
+    $v = Get-IniValue $cur 'networkingMode'; if ($v) { $defMirror = ($v -match '(?i)mirrored') }
+
+    Write-Host ""
+    Note "  [1] conservarlo tal cual"
+    Note "  [2] actualizar solo estas claves, respetando tus comentarios"
+    Note "  [3] reemplazarlo entero por el de referencia"
+    $ans = Field "Que hago" "2"
+    switch ("$ans".Trim()) {
+        '1'     { $W_ConfigMode = 'skip' }
+        '3'     { $W_ConfigMode = 'replace' }
+        default { $W_ConfigMode = 'merge' }
+    }
+    if ($W_ConfigMode -eq 'skip') { Note "se conserva tal cual" }
 }
 
-if ($W_WriteConfig) {
+if ($W_ConfigMode -ne 'skip') {
     Write-Host ""
     Write-Host "  Recursos de WSL" -ForegroundColor Cyan
     Note "Detectado: ${totalGb}GB de RAM, $cpus CPUs"
-    $W_Mem   = Num   "Memoria (GB)" ([math]::Max(4, [math]::Floor($totalGb / 2))) 2 $totalGb
-    $W_Cpus  = Num   "CPUs"         $cpus 1 $cpus
-    $W_Swap  = Num   "Swap (GB)"    4 0 64
+    $W_Mem   = Num   "Memoria (GB)" $defMem  2 $totalGb
+    $W_Cpus  = Num   "CPUs"         $defCpus 1 $cpus
+    $W_Swap  = Num   "Swap (GB)"    $defSwap 0 64
     Write-Host ""
     Write-Host "  Red" -ForegroundColor Cyan
     Note "El modo espejo comparte el loopback con Windows, pero rompe"
     Note "algunas VPN corporativas. Si usas una, responde que no."
-    $W_Mirror = YesNo "Modo espejo" $true
+    $W_Mirror = YesNo "Modo espejo" $defMirror
 }
 
 Write-Host ""
@@ -196,7 +285,7 @@ Ok "WSL2 listo"
 # ============================================================ 2. .wslconfig
 Say "3/7 · Configuracion de WSL (.wslconfig)"
 
-if (-not $W_WriteConfig) {
+if ($W_ConfigMode -eq 'skip') {
     Ok "conservado el $wslConfig que ya tenias"
 } else {
     if ($haveWslConfig) {
@@ -204,35 +293,52 @@ if (-not $W_WriteConfig) {
         Copy-Item $wslConfig $bak -Force
         Note "copia del anterior en $bak"
     }
-    $net = if ($W_Mirror) { @"
 
-# Modo espejo: WSL replica las interfaces de Windows en vez de vivir tras un
-# NAT, y comparten loopback. Si una VPN deja de resolver, comenta estas tres.
-networkingMode=mirrored
-dnsTunneling=true
-autoProxy=true
+    $wsl2 = [ordered]@{
+        memory            = "${W_Mem}GB"
+        processors        = "$W_Cpus"
+        swap              = "${W_Swap}GB"
+        autoMemoryReclaim = 'gradual'   # devuelve RAM a Windows sin reiniciar
+        sparseVhd         = 'true'      # el disco virtual no crece sin fin
+    }
+    if ($W_Mirror) {
+        # Modo espejo: WSL replica las interfaces de Windows en vez de vivir
+        # tras un NAT, y comparten loopback.
+        $wsl2['networkingMode'] = 'mirrored'
+        $wsl2['dnsTunneling']   = 'true'
+        $wsl2['autoProxy']      = 'true'
+    }
 
-[experimental]
-hostAddressLoopback=true
-"@ } else { @"
-
-# Red en NAT (el valor por defecto de WSL): mas compatible con VPN corporativas.
-# Para hablar con servicios de Windows desde Linux por 127.0.0.1 haria falta
-# networkingMode=mirrored.
-"@ }
-    @"
-[wsl2]
-memory=${W_Mem}GB
-processors=$W_Cpus
-swap=${W_Swap}GB
-
-# Devuelve memoria a Windows en vez de retenerla hasta el reinicio.
-autoMemoryReclaim=gradual
-# El disco virtual no crece de forma indefinida.
-sparseVhd=true
-$net
-"@ | Set-Content -Path $wslConfig -Encoding UTF8
-    Ok "escrito $wslConfig (${W_Mem}GB RAM, $W_Cpus CPUs, ${W_Swap}GB swap)"
+    if ($W_ConfigMode -eq 'merge' -and $haveWslConfig) {
+        # Solo se tocan las claves de arriba: el resto del fichero, comentarios
+        # incluidos, queda como estaba.
+        $lines = @(Read-IniLines $wslConfig)
+        $lines = Merge-Ini -Lines $lines -Section 'wsl2' -Pairs $wsl2
+        if ($W_Mirror) {
+            # hostAddressLoopback va en [experimental]: en [wsl2] WSL la rechaza
+            # con "Unknown key".
+            $lines = Merge-Ini -Lines $lines -Section 'experimental' -Pairs @{ hostAddressLoopback = 'true' }
+        }
+        Write-IniLines $wslConfig $lines
+        Ok "actualizado $wslConfig (${W_Mem}GB RAM, $W_Cpus CPUs, ${W_Swap}GB swap)"
+        Note "tus comentarios y el resto de claves siguen ahi"
+    } else {
+        $body = New-Object System.Collections.Generic.List[string]
+        $body.Add('[wsl2]')
+        foreach ($k in $wsl2.Keys) { $body.Add("$k=$($wsl2[$k])") }
+        if ($W_Mirror) {
+            $body.Add('')
+            $body.Add('[experimental]')
+            $body.Add('hostAddressLoopback=true')
+        } else {
+            $body.Add('')
+            $body.Add('# Red en NAT, el valor por defecto de WSL: mas compatible con VPN')
+            $body.Add('# corporativas. Para llegar a los servicios de Windows desde Linux por')
+            $body.Add('# 127.0.0.1 haria falta networkingMode=mirrored.')
+        }
+        Write-IniLines $wslConfig $body.ToArray()
+        Ok "escrito $wslConfig (${W_Mem}GB RAM, $W_Cpus CPUs, ${W_Swap}GB swap)"
+    }
 }
 
 # ============================================================ 3. Distro
