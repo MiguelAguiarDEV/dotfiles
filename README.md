@@ -98,11 +98,12 @@ saneado a un nombre válido en Linux.
 
 ```bash
 docker run -it --rm ubuntu:24.04 bash -c \
-  'apt-get update -qq && apt-get install -y -q curl sudo git >/dev/null && \
-   curl -fsSL https://raw.githubusercontent.com/MiguelAguiarDEV/dotfiles/main/bootstrap.sh | bash'
+  'apt-get update -qq && apt-get install -y -q curl sudo git ca-certificates >/dev/null && \
+   bash <(curl -fsSL https://raw.githubusercontent.com/MiguelAguiarDEV/dotfiles/main/bootstrap.sh)'
 ```
 
-Contenedor de usar y tirar: tu sistema no se toca.
+Contenedor de usar y tirar: tu sistema no se toca. El `-it` es necesario para
+que el asistente pueda preguntar.
 
 ## Instalación
 
