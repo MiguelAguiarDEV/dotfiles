@@ -272,14 +272,41 @@ Write-Host ""
 # ============================================================ 1. Features
 Say "2/7 - WSL2"
 
+# Lo primero es preguntarle a WSL, no a la lista de features de Windows: en
+# Windows 11 WSL se instala como app de la Store, y entonces
+# Microsoft-Windows-Subsystem-Linux aparece como Disabled aunque WSL funcione
+# perfectamente. Mirar las features llevaria a habilitarlas y pedir un reinicio
+# que no hace falta.
+$wslReady = $false
+try {
+    $null = Invoke-WslCli @('--version')
+    $wslReady = ($LASTEXITCODE -eq 0)
+} catch { $wslReady = $false }
+
 $needReboot = $false
-foreach ($f in 'Microsoft-Windows-Subsystem-Linux', 'VirtualMachinePlatform') {
-    $state = (Get-WindowsOptionalFeature -Online -FeatureName $f).State
-    if ($state -ne 'Enabled') {
+if ($wslReady) {
+    Ok "WSL ya funciona en esta maquina"
+} else {
+    # Se usa dism.exe y no Get-/Enable-WindowsOptionalFeature: esos cmdlets vienen
+    # del modulo DISM, que en PowerShell 7 falla con "Class not registered".
+    # dism.exe funciona igual desde 5.1 y desde 7. El flag /english fija el
+    # idioma de la salida: sin el viene traducida y "State : Enabled" no se
+    # puede buscar.
+    function Get-FeatureState([string]$name) {
+        $out = (& dism.exe /online /get-featureinfo /featurename:$name /english 2>&1) | Out-String
+        if ($out -match 'State\s*:\s*(\S+)') { $Matches[1] } else { $null }
+    }
+
+    foreach ($f in 'Microsoft-Windows-Subsystem-Linux', 'VirtualMachinePlatform') {
+        if ((Get-FeatureState $f) -eq 'Enabled') { Ok "$f ya habilitado"; continue }
         Note "habilitando $f..."
-        $r = Enable-WindowsOptionalFeature -Online -FeatureName $f -NoRestart -All
-        if ($r.RestartNeeded) { $needReboot = $true }
-    } else { Ok "$f ya habilitado" }
+        & dism.exe /online /enable-feature /featurename:$f /all /norestart /english | Out-Null
+        switch ($LASTEXITCODE) {
+            0     { Ok "$f habilitado" }
+            3010  { Ok "$f habilitado"; $needReboot = $true }   # 3010 = pide reinicio
+            default { Die "no se pudo habilitar $f (dism devolvio $LASTEXITCODE)" }
+        }
+    }
 }
 
 if ($needReboot) {
