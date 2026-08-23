@@ -107,7 +107,16 @@ Contenedor de usar y tirar: tu sistema no se toca.
 ## Instalación
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/MiguelAguiarDEV/dotfiles/main/bootstrap.sh | bash
+bash <(curl -fsSL https://raw.githubusercontent.com/MiguelAguiarDEV/dotfiles/main/bootstrap.sh)
+```
+
+Con `bash <(...)` y **no** `curl … | bash`: en la tubería el script hereda el
+stdin de `curl` y el asistente no puede leer tus respuestas.
+
+Mismo aviso de caché que arriba — para forzar la versión recién subida:
+
+```bash
+bash <(curl -fsSL "https://raw.githubusercontent.com/MiguelAguiarDEV/dotfiles/main/bootstrap.sh?$(date +%s)")
 ```
 
 Sobre tu propio fork, sin editar nada:
